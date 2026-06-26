@@ -213,19 +213,25 @@ def fig_hodge():
     ax[0].legend(); plotstyle.grid(ax[0]); ax[0].invert_xaxis()
     ax[0].set_title(r"(a) one decomposition: residual $\to 0$ as $\Delta\to0$")
 
-    # ---- panel 2: iterated decay r_k/r0 ----
-    runs = [("box", "projection", 0.3, False, "tab:red", "box proj (interior src)"),
-            ("tank", "projection", 0.3, False, "tab:blue", "tank proj (interior src)"),
-            ("box", "ghost", 0.3, False, "tab:green", "box ghost (interior src)"),
-            ("box", "projection", 0.3, True, "tab:gray", "box proj (raw src)")]
+    # ---- panel 2: iterated decay r_k/r0 -- fixed unit step vs minimal-residual step ----
+    # Interior-source runs (consistent): both fixed and MR stall at the defect near-null floor.
+    # Raw-source runs (full truncated wall divergence): the FIXED step DIVERGES (rho>1) while the
+    # MR step stays non-expansive (rho<=1) -- the manufactured-field analogue of the unsteady solver.
+    runs = [("box", "projection", 0.3, False, "tab:red", "box proj, interior src"),
+            ("box", "projection", 0.3, True, "tab:gray", "box proj, raw src"),
+            ("tank", "projection", 0.3, True, "tab:blue", "tank proj, raw src")]
     for domain, wc, jit, raw, col, lbl in runs:
         case = hp.run_case(domain, 0.045, wc, "trb", 7, jit)
         rs = np.array(hp.iterate(case, kmax=60, tol=1e-12, raw=raw))
-        ks = np.arange(len(rs))
-        ax[1].semilogy(ks, rs / rs[0], "-", color=col, lw=1.6, label=lbl)
+        ax[1].semilogy(np.arange(len(rs)), rs / rs[0], "-", color=col, lw=1.6,
+                       label="fixed: " + lbl)
+        if raw:  # the minimal-residual cure for the diverging (raw-source) cases
+            rm = np.array(hp.iterate_mr(case, kmax=60, tol=1e-12, raw=raw))
+            ax[1].semilogy(np.arange(len(rm)), rm / rm[0], "--", color=col, lw=1.6,
+                           label="MR: " + lbl)
     ax[1].set_xlabel(r"projection iteration $k$"); ax[1].set_ylabel(r"$\|\nabla\!\cdot u^{(k)}\| / \|\nabla\!\cdot u^*\|$")
-    ax[1].legend(); plotstyle.grid(ax[1])
-    ax[1].set_title(r"(b) iterated defect correction: floor, not zero")
+    ax[1].legend(fontsize=8); plotstyle.grid(ax[1])
+    ax[1].set_title(r"(b) iterated defect correction: fixed step diverges, MR step bounded")
 
     # ---- panel 3: operator comparison (Dirichlet box, common gradient) ----
     res = hp.compare_operators(dxs=hp.DXS_BOX, seeds=(7, 11, 19))

@@ -429,6 +429,47 @@ def iterate(case, kmax=KMAX, tol=ITOL, raw=False):
     return rs
 
 
+def iterate_mr(case, kmax=KMAX, tol=ITOL, raw=False):
+    """Minimal-residual (optimal-step) defect correction. Same search direction as
+    iterate() -- solve L d_phi = D u^{(k)} (homogeneous BC, same factorization) -- but
+    instead of the FIXED unit step u -= G d_phi, take the step that minimises the residual
+    divergence. With r = D u and g = D G d_phi, the post-step divergence is exactly
+    r - alpha g (D is linear), so
+
+        alpha = <r, g> / <g, g>   (interior inner products)
+
+    minimises ||D u||_interior and gives ||r_{k+1}|| <= ||r_k|| UNCONDITIONALLY -- for any
+    cloud, any source, regardless of rho(E L^-1). It is the line search along the same
+    direction the fixed-step iteration uses, i.e. a minimal-residual (steepest-descent)
+    accelerator of the defect correction. Returns [r0, r1, r2, ...] like iterate()."""
+    cache, A, Nvec = case["cache"], case["A"], case["Nvec"]
+    interior, pin, dx = case["interior"], case["pin"], case["dx"]
+    us, u = case["us"], case["u"].copy()
+    N, d = case["pos"].shape
+    lu = splu(A.tocsc())
+    rs = [wnorm(divergence(cache, us, N, d), interior, dx)]
+    rs.append(wnorm(divergence(cache, u, N, d), interior, dx))
+    for _ in range(kmax):
+        du = divergence(cache, u, N, d)            # r = D u
+        b = du / Nvec                              # homogeneous increment direction
+        if not raw:
+            b[~interior] = 0.0
+        if pin is not None:
+            b[pin] = 0.0
+        dphi = lu.solve(b)
+        Gdphi = grad_scalar(cache, dphi, N, d)
+        g = divergence(cache, Gdphi, N, d)         # g = D G d_phi
+        m = interior
+        den = float(np.sum(g[m] * g[m]))
+        alpha = float(np.sum(du[m] * g[m]) / den) if den > 1e-30 else 0.0
+        u = u - alpha * Gdphi                       # optimal-step correction
+        r = wnorm(divergence(cache, u, N, d), interior, dx)
+        rs.append(r)
+        if r <= tol * rs[0] or r < 1e-14:
+            break
+    return rs
+
+
 def contraction(rs, last=6):
     """ASYMPTOTIC per-step contraction from the final `last` iterations (more stable
     than a whole-tail geometric mean, which is skewed by the fast initial drop), plus

@@ -56,7 +56,9 @@ error by about an order of magnitude and, with the sum normalisation, approaches
 second-order convergence at a straight Neumann boundary. Used in a Helmholtz--Hodge
 decomposition, the renormalised operators are shown to be consistent for a single decomposition,
 the residual divergence equalling the operators' non-adjointness defect and vanishing under
-refinement.
+refinement; the fixed-step iteration of the decomposition is preconditioned Richardson on the
+non-adjoint pairing and can diverge, whereas a minimal-residual step renders it non-expansive and
+stable on disordered or time-evolving clouds.
 \end{abstract}
 
 \begin{keyword}
@@ -75,6 +77,9 @@ physical space before renormalisation.
 the normalisation it approaches second-order convergence.
 \item In a Helmholtz--Hodge decomposition the operators are consistent, the
 residual divergence being their non-adjointness defect, but vanishing with refinement.
+\item Iterating the decomposition is preconditioned Richardson on the non-adjoint
+divergence--gradient pairing; a minimal-residual step makes it non-expansive and stable where the
+fixed-step iteration diverges.
 \end{highlights}
 
 \end{frontmatter}
@@ -1200,18 +1205,51 @@ consistency is thus a property of how the divergence and gradient are paired, mo
 Laplacian's formal order, which is consistent with the central finding of this work that the
 closure, and not the interior order, governs the realised accuracy.
 
-The residual can be reduced further by repeating the decomposition, solving
-Eq.~\eqref{eq:projection} for the current divergence and re-correcting. This defect correction
-lowers the residual to a floor of about one to a few percent of the initial divergence, after
-which it stalls, the asymptotic contraction factor approaching unity; the iteration does not
-reach a divergence-free state, because the commutation defect has a near-null mode that it
-cannot remove [Fig.~\ref{fig:hodge}(b)]. If the raw one-sided divergence at the wall nodes is
-fed to the source rather than carried by the Neumann condition, the iteration diverges. This is
-the flux-only Neumann limitation of Section~\ref{sec:closure} reappearing in the divergence of
-the field, and it indicates that the divergence wall term is itself a candidate for the
-algebraic-ghost completion. The renormalised closure is therefore suited to a single
-Helmholtz--Hodge decomposition, where it gives a small residual divergence that vanishes under
-refinement, rather than to an iteration towards an exactly divergence-free field.
+The residual can be reduced further by repeating the decomposition: solving
+Eq.~\eqref{eq:projection} for the current divergence $r_k=\langle\nabla\!\cdot\mathbf u_k\rangle$
+and re-correcting, $\mathbf u_{k+1}=\mathbf u_k-\gradop{\delta\phi_k}$ with
+$\mathsf L\,\delta\phi_k=r_k$. Taking the discrete divergence of the update shows that this defect
+correction is a fixed-point (Richardson) iteration whose residual propagates by
+\begin{equation}
+  r_{k+1}=\big(\mathsf I-\mathsf D\mathsf G\,\mathsf L^{-1}\big)\,r_k
+         =(\mathsf L-\mathsf D\mathsf G)\,\mathsf L^{-1}\,r_k,
+  \label{eq:hodgeiter}
+\end{equation}
+i.e. it is preconditioned Richardson for the exact-projection system $\mathsf D\mathsf G\,\phi=r$
+with the renormalised Laplacian as preconditioner, and its convergence is governed by the spectral
+radius of the commutation defect $(\mathsf L-\mathsf D\mathsf G)\,\mathsf L^{-1}$. With the
+consistent interior source that radius is below but close to unity, so the iteration lowers the
+residual to a floor of about one to a few percent of the initial divergence and then stalls,
+never reaching a divergence-free state because the defect has a near-null mode it cannot remove
+[Fig.~\ref{fig:hodge}(b)]. If the raw one-sided divergence at the wall nodes is fed to the source
+rather than carried by the Neumann condition the radius exceeds unity and the iteration diverges
+(Fig.~\ref{fig:hodge}(b), $\rho_\infty\!\approx\!1.2$--$1.5$); this is the flux-only Neumann
+limitation of Section~\ref{sec:closure} reappearing in the divergence of the field, and it
+indicates that the divergence wall term is itself a candidate for the algebraic-ghost completion.
+The same mechanism limits a fixed-step pressure projection in an unsteady Lagrangian solver, where
+the source is the rough divergence of a straining, disordered cloud and the unit step amplifies the
+defect's particle-scale modes.
+
+The fixed unit step is, however, not intrinsic to the decomposition and can be replaced by the step
+that minimises the residual. Since $\mathsf D$ is linear, correcting
+$\mathbf u_{k+1}=\mathbf u_k-\alpha_k\gradop{\delta\phi_k}$ leaves the exact divergence
+$r_{k+1}=r_k-\alpha_k\,\mathsf g_k$ with $\mathsf g_k=\mathsf D\mathsf G\,\delta\phi_k$, so the
+minimiser
+\begin{equation}
+  \alpha_k=\frac{\langle r_k,\,\mathsf g_k\rangle}{\langle \mathsf g_k,\,\mathsf g_k\rangle}
+  \label{eq:mrstep}
+\end{equation}
+gives $\|r_{k+1}\|\le\|r_k\|$ \emph{unconditionally}, for any cloud and any source, irrespective of
+the spectral radius in Eq.~\eqref{eq:hodgeiter}. This minimal-residual (steepest-descent) step is a
+line search along the same direction the fixed iteration uses and costs one extra divergence
+evaluation and two inner products per sweep. On the diverging raw-source cases it brings the
+asymptotic factor from $\rho_\infty\!\approx\!1.2$--$1.5$ down to $\rho_\infty\!\le\!1$, with a
+residual floor several times smaller than the value the fixed step reaches before it blows up
+[Fig.~\ref{fig:hodge}(b)]; on the consistent interior source it stalls at the same near-null floor
+as the fixed step, now monotonically. The renormalised closure is therefore suited to a single
+Helmholtz--Hodge decomposition, with a small residual divergence that vanishes under refinement;
+iterating it is stable only with the minimal-residual step, which is the form to use when an
+approximately divergence-free field is sought from disordered or time-evolving clouds.
 
 \begin{figure}[t]
   \centering
@@ -1220,8 +1258,11 @@ refinement, rather than to an iteration towards an exactly divergence-free field
   field~\eqref{eq:hodgefield}. (a) The residual divergence of the solenoidal part after one
   decomposition against $\Delta$, on the box with the projection and algebraic-ghost Neumann
   closures and on the wedge tank, with an order-one reference; it vanishes under refinement.
-  (b) Iterated defect correction at chaos $60\%$: the residual falls to a floor and stalls,
-  while feeding the raw one-sided wall divergence to the source diverges. (c) The choice of
+  (b) Iterated defect correction at chaos $60\%$, fixed unit step (solid) versus the
+  minimal-residual step of Eq.~\eqref{eq:mrstep} (dashed): with the consistent interior source the
+  fixed step falls to a floor and stalls; feeding the raw one-sided wall divergence to the source
+  makes the fixed step diverge ($\rho_\infty>1$), whereas the minimal-residual step stays
+  non-expansive ($\rho_\infty\le1$) and reaches a lower floor. (c) The choice of
   Laplacian, with a shared gradient on a Dirichlet box: the uncorrected summation diverges,
   whereas the renormalised, GFDM and Full-Inverse operators are consistent and close, the
   residual being set by the gradient pairing rather than the Laplacian order.}
@@ -1328,9 +1369,12 @@ decomposition, because the residual is set by the divergence--gradient pairing a
 interior order (Section~\ref{sec:hodge}). The simple, low-order operator is therefore as
 effective as the higher-accuracy operators for this purpose, at a fraction of the cost, and the
 small remaining residual is reduced further by iterating the decomposition, which drives the
-divergence down to a floor of about one percent. A low-order but conveniently assembled
-operator, combined appropriately and applied iteratively, thus performs the Helmholtz--Hodge
-decomposition on a par with the higher-order alternatives.
+divergence down to a floor of about one percent. That iteration must take the minimal-residual
+step (Section~\ref{sec:hodge}): being preconditioned Richardson on the non-adjoint
+divergence--gradient pairing, the fixed unit step can amplify the defect on disordered or
+time-evolving clouds, whereas the optimal step is non-expansive by construction. A low-order but
+conveniently assembled operator, combined appropriately and applied iteratively in this way, thus
+performs the Helmholtz--Hodge decomposition on a par with the higher-order alternatives.
 
 % =============================================================================
 \section{Conclusions}
@@ -1372,9 +1416,11 @@ to be consistent for a single decomposition, with the residual divergence equal 
 non-adjointness defect and vanishing under refinement, and governed by the divergence--gradient
 pairing rather than the Laplacian order. In consequence the simple low-order operator cleans the
 same fraction of the divergence in a single decomposition as the second-order GFDM and
-Full-Inverse operators, and an iterated decomposition reduces the residual further, so the
-conveniently assembled low-order construction performs the Helmholtz--Hodge decomposition on a
-par with the higher-accuracy alternatives (Table~\ref{tab:schemes}). A full incompressible-flow
+Full-Inverse operators, and an iterated decomposition with the minimal-residual step --- which
+keeps the iteration stable on the disordered, time-evolving clouds where a fixed step would
+diverge --- reduces the residual further, so the conveniently assembled low-order construction
+performs the Helmholtz--Hodge decomposition on a par with the higher-accuracy alternatives
+(Table~\ref{tab:schemes}). A full incompressible-flow
 application would
 additionally require the no-slip velocity Robin condition and the stress-free surface, which
 inherit the same boundary-condition-by-type treatment, and a divergence-free time integration;
