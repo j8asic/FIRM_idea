@@ -1,0 +1,40 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# --- LaTeX build artifacts (paper/) ---
+*.aux
+*.log
+*.bbl
+*.blg
+*.spl
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
+# --- Editor / desktop local config ---
+.obsidian/
+.directory
+*.base
+.vscode/
+.idea/
+.DS_Store
+
+# --- Superseded spec drafts (kept locally, not published; docs/spec.md is canonical) ---
+/brainstorm_v0.md
+/brainstorm_v1.md
+/brainstorm_v2.md
+
+# --- Off-spec legacy prototypes (superseded by firm/) ---
+/firm_hydrostatic.py
+/firm_unified_gram.py
+/laplacian.py
+
+# --- Stray regenerable capstone outputs (regenerate via: firm/run_all.py --plot) ---
+/firm/capstone_convergence.png
+/firm/capstone_error_field.png
