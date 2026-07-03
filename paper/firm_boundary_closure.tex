@@ -5,11 +5,11 @@
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{url}
-\graphicspath{{../firm/figures/}}
+\graphicspath{{figures/}}
 
 \journal{Journal of Computational Physics}
 
-% ----- convenience macros (notation consistent with Basic et al. 2018) -------
+% - convenience macros (notation consistent with Basic et al. 2018) -
 \newcommand{\xij}{\mathbf{x}_{ij}}
 \newcommand{\Mi}{\mathbf{M}_i}
 \newcommand{\Bi}{\mathbf{B}_i}
@@ -34,31 +34,22 @@
 \address[b]{School of Civil Engineering, Southeast University, 211189 Nanjing, China}
 
 \begin{abstract}
-A boundary-condition closure for renormalised, least-squares corrected meshless Laplacian
-operators is presented. In contrast to treatments that pad the domain with auxiliary particles,
-embed it in a level set, or enforce the condition through a weak form, the closure is algebraic
-and strong-form: the Neumann and free-surface conditions are folded directly into the discrete
-collocation row on a single code path, with the boundary detected from the point cloud and
-without tuning parameters. The closure is organised by the condition type. A
-Neumann flux enters the right-hand side, and a Dirichlet or Robin value enters the diagonal.
-The Neumann flux is imposed by a tangential projection performed in physical space before
-renormalisation. A general Gram projector treats non-orthogonal corners exactly, and a
-complementary algebraic-ghost closure completes the truncated boundary stencil by reflecting
-the neighbours and the node itself across the local reflection group, without extra unknowns.
-The free surface is detected from the support-deficiency geometry, and its enforcement
-strength cancels to the total kernel weight, which removes any penalty or threshold
-parameter. The introduced method, named FIRM (Flux-Integrated Renormalised Meshless), is
-verified against analytic ground truths and on irregular-domain Poisson benchmarks, for
-regular and highly irregular point clouds in two dimensions, against a second-order
-generalised finite difference baseline. The operators are linear-exact on any cloud. The
-value closure supraconverges, and the algebraic-ghost closure reduces the Neumann-limited
-error by about an order of magnitude and, with the sum normalisation, approaches
-second-order convergence at a straight Neumann boundary. Used in a Helmholtz--Hodge
-decomposition, the renormalised operators are shown to be consistent for a single decomposition,
-the residual divergence equalling the operators' non-adjointness defect and vanishing under
-refinement; the fixed-step iteration of the decomposition is preconditioned Richardson on the
-non-adjoint pairing and can diverge, whereas a minimal-residual step renders it non-expansive and
-stable on disordered or time-evolving clouds.
+A boundary-condition closure for renormalised, least-squares corrected meshless Laplacian operators is presented.
+The closure is algebraic and operates in strong form.
+Unlike other methods, the approach does not pad the domain with auxiliary particles, represent the boundary with a level set, or enforce the conditions weakly.
+Instead, a single code path folds both Neumann and free-surface conditions directly into the discrete collocation row.
+The algorithm detects the boundary from the point cloud, requiring no tuning parameters, and organises the closure by the type of condition.
+A Neumann flux goes to the right-hand side, while a Dirichlet or Robin value enters the diagonal.
+The Neumann flux is imposed using a tangential projection in physical space before renormalisation.
+A general Gram projector treats non-orthogonal corners exactly.
+Furthermore, a complementary algebraic-ghost closure completes the truncated boundary stencil by reflecting neighbours and the node itself across the local reflection group, requiring no extra unknowns. The free surface is detected from the support-deficiency geometry of the cloud.
+Its enforcement strength cancels out to the total kernel weight, removing any penalty or threshold parameters.
+The proposed method, named FIRM (Flux-Integrated Renormalised Meshless), is verified against analytical ground truths and irregular-domain Poisson benchmarks.
+Both regular and highly irregular point clouds in two dimensions are tested against a second-order generalised finite difference baseline, demonstrating that the operators remain exact for linear fields on any cloud.
+The value closure supraconverges, and the algebraic-ghost closure reduces the Neumann-limited error by about an order of magnitude.
+With the sum normalisation, the method approaches second-order convergence at straight boundaries.
+Finally, the renormalised operators are shown to be consistent for a single Helmholtz-Hodge decomposition.
+The residual divergence equals the non-adjointness defect of the operators, which vanishes under refinement.
 \end{abstract}
 
 \begin{keyword}
@@ -67,19 +58,11 @@ free surface \sep Neumann \sep Poisson equation
 \end{keyword}
 
 \begin{highlights}
-\item A unified boundary closure integrates Neumann and Dirichlet or Robin conditions into
-renormalised meshless operators on one code path.
-\item The free surface is detected from the point cloud and enforced without a tuning
-parameter, the enforcement strength cancelling to the total kernel weight.
-\item Non-orthogonal corners are treated exactly by a general Gram projector applied in
-physical space before renormalisation.
-\item An algebraic-ghost closure restores Neumann accuracy without extra unknowns, and with
-the normalisation it approaches second-order convergence.
-\item In a Helmholtz--Hodge decomposition the operators are consistent, the
-residual divergence being their non-adjointness defect, but vanishing with refinement.
-\item Iterating the decomposition is preconditioned Richardson on the non-adjoint
-divergence--gradient pairing; a minimal-residual step makes it non-expansive and stable where the
-fixed-step iteration diverges.
+\item A unified boundary closure is introduced, integrating Neumann and Dirichlet or Robin conditions into renormalised meshless operators on a single code path.
+\item The method detects the free surface from the point cloud and enforces it without tuning parameters, as the enforcement strength cancels to the total kernel weight.
+\item A general Gram projector, applied in physical space before renormalisation, treats non-orthogonal corners exactly.
+\item An algebraic-ghost closure restores Neumann accuracy without extra unknowns, approaching second-order convergence under the sum normalisation.
+\item Consistency is demonstrated in a Helmholtz-Hodge decomposition, where the residual divergence represents the non-adjointness defect of the operators and vanishes under refinement.
 \end{highlights}
 
 \end{frontmatter}
@@ -88,148 +71,123 @@ fixed-step iteration diverges.
 \section{Introduction}
 \label{sec:intro}
 
-The numerical solution of elliptic boundary value problems on irregular domains is a
-recurring requirement across computational physics. It is especially demanding for meshless
-discretisations in which the computational nodes move and the domain boundary is not
-represented by a conforming mesh, as in the pressure projection of incompressible free-surface
-flow and, more generally, in diffusion, electrostatics, and porous-media seepage on irregular or
-evolving domains. In a companion study, a class of renormalised meshless
-Laplacian operators was introduced for the Poisson and diffusion
-equations~\cite{Basic2018}. These operators are corrected by a local least-squares moment
-matrix and remain consistent on highly irregular point arrangements, where the classical
-smoothed-particle-hydrodynamics (SPH) Laplacian fails to
-converge~\cite{Brookshaw1985,Monaghan1983,Fatehi2011}. Their least-squares correction belongs
-to the kernel-gradient renormalisation lineage developed to restore particle
-consistency~\cite{Randles1996,Bonet1999,Sigalotti2021}. That study, however, treated the
-interior operator and reported Dirichlet and Robin results on prescribed domains only; it left
-open how a boundary condition is integrated into the renormalised operator when the boundary is
-detected from the cloud rather than prescribed, and how Neumann and free-surface boundaries are
-handled on a single code path. The present work closes this boundary gap, and is orthogonal to
-the recent extension of the same interior operator to full second-order consistency on
-disordered clouds by Asai et al.~\cite{Asai2023}.
+Solving elliptic boundary value problems on irregular domains is a common requirement in computational physics.
+This task becomes particularly difficult when using meshless discretisations.
+In these methods, the computational nodes move freely, meaning no conforming mesh represents the boundary.
+This challenge is observed in the pressure projection step of incompressible free-surface flows.
+It also appears in diffusion processes, electrostatics, and seepage through porous media on irregular or evolving domains.
+A companion study introduced a class of renormalised meshless Laplacian operators for the Poisson and diffusion equations~\cite{Basic2018}.
+These operators use a local least-squares moment matrix for correction.
+Consequently, the operators maintain consistency even on highly irregular point arrangements, where the classical SPH Laplacian fails to converge~\cite{Brookshaw1985,Monaghan1983,Fatehi2011}.
+This least-squares correction belongs to the kernel-gradient renormalisation lineage, which researchers originally developed to restore particle consistency~\cite{Randles1996,Bonet1999,Sigalotti2021}.
+However, that previous study only focused on the interior operator.
+That study reported Dirichlet and Robin results on prescribed domains, leaving several key questions open.
+Specifically, how are boundary conditions integrated when the boundary is detected from the point cloud rather than prescribed?
+How can Neumann and free-surface boundaries be handled on a single code path?
+The present work closes this boundary gap.
+The proposed approach complements and is orthogonal to the work of Asai et al.~\cite{Asai2023}, who recently extended the same interior operator to full second-order consistency on disordered clouds.
 
-Handling boundaries on meshless or otherwise irregular domains has been approached through
-several distinct methodological families, which differ less in accuracy than in what each
-requires of the geometry. A first family represents the boundary geometrically and embeds it
-in a background grid. In the level-set tradition, Gibou and co-workers built
-second-order-accurate symmetric discretisations of the Poisson equation on irregular domains
-through a ghost-value treatment~\cite{Gibou2002,MinGibou2007,GibouMin2012,Mirzadeh2016},
-extended to Robin conditions on implicit interfaces~\cite{Papac2013} and to Voronoi interface
-constructions~\cite{Guittet2015}; these methods are accurate and well analysed, but they
-require an adaptive Cartesian grid and a level-set description of the geometry. A second family
-represents the boundary with auxiliary material. In SPH and ISPH, solid walls and free
-surfaces are carried by dummy or mirror particles, repulsive forces, or generalised wall
-conditions~\cite{Adami2012,Colagrossi2003,Marrone2011}, by semi-analytical boundary
-integrals~\cite{Ferrand2013,Leroy2014,Macia2012}, or by the corrected Laplacians of the
-moving-particle semi-implicit family~\cite{Koshizuka1998,Ikari2015,Huang2016,Tamai2017,Ma2016};
-these treatments are effective but typically introduce auxiliary particles and a tuning length
-or threshold, the free surface in particular being identified by a thresholded density or
-kernel-sum criterion. A third family appends the boundary condition as additional algebraic
-rows: in the generalised finite difference (GFDM) and finite-pointset (FPM) methods a full
-Taylor basis is fitted by weighted least squares and the conditions enter as constraint
-rows~\cite{Benito2001,Kuhnert2001,Tiwari2003,Trask2017}, while radial-basis-function finite
-differences recover boundary accuracy by adding ghost nodes outside the
-domain~\cite{Bayona2010,Fedoseyev2002,Dobravec2024}. Across these families the boundary is paid
-for with stored degrees of freedom, a background grid, or a tuning parameter.
+Researchers have proposed several methods to handle boundaries on meshless or irregular domains.
+These methods differ less in their final accuracy and more in what is required from the geometry.
+In the first approach, a background grid represents and defines the boundary geometrically.
+For instance, in the level-set tradition, researchers built second-order-accurate symmetric discretisations of the Poisson equation on irregular domains using a ghost-value treatment~\cite{Gibou2002,MinGibou2007,GibouMin2012,Mirzadeh2016}.
+Subsequent works extended this treatment to Robin conditions on implicit interfaces~\cite{Papac2013} and to Voronoi interface constructions~\cite{Guittet2015}.
+This approach requires an adaptive Cartesian grid and a level-set description of the geometry.
+In a second approach, auxiliary material represents the boundary.
+In SPH and ISPH, dummy or mirror particles, repulsive forces, or generalised wall conditions carry solid walls and free surfaces~\cite{Adami2012,Colagrossi2003,Marrone2011}.
+Other variants use semi-analytical boundary integrals~\cite{Ferrand2013,Leroy2014,Macia2012}, or corrected Laplacians from the moving-particle semi-implicit category~\cite{Koshizuka1998,Ikari2015,Huang2016,Tamai2017,Ma2016}.
+While effective, these treatments typically introduce auxiliary particles and require tuning a length scale or a threshold.
+For example, a thresholded density or kernel-sum criterion usually identifies the free surface.
+In a third approach, the formulation appends the boundary condition as additional algebraic rows.
+In the generalised finite difference method (GFDM) and the finite-pointset method (FPM), weighted least squares fits a full Taylor basis, and the boundary conditions enter as constraint rows~\cite{Benito2001,Kuhnert2001,Tiwari2003,Trask2017}.
+Similarly, radial-basis-function finite differences recover boundary accuracy by adding ghost nodes outside the domain~\cite{Bayona2010,Fedoseyev2002,Dobravec2024}.
+Across all these techniques, boundary enforcement comes at a price.
+It demands stored degrees of freedom, a background grid, or a tuning parameter.
 
-A separate line of work injects the boundary condition into the discrete equations
-\emph{algebraically}, rather than padding the domain with stored geometry, and three strands may
-be distinguished. The first embeds the condition in the trial space \emph{a priori}, so that
-every admissible field satisfies it by construction: the R-function method builds
-boundary-conforming solution structures from implicit
-geometry~\cite{Shapiro2007,ShapiroTsukanov1999}, weighted extended B-splines weight a
-tensor-product basis by a boundary distance function~\cite{Hoellig2003}, and the same
-construction underlies the exact imposition of boundary conditions in neural and
-physics-informed solvers through distance functions~\cite{Lagaris1998,SukumarSrivastava2022}.
-The second injects the condition into the variational form rather than the basis: in
-element-free Galerkin and related meshfree methods the moving-least-squares shape functions lack
-the Kronecker-delta property and so cannot pin nodal values
-directly~\cite{Belytschko1994,FernandezMendez2004}, and essential conditions are instead
-enforced weakly through Nitsche's method~\cite{Nitsche1971} or a penalty~\cite{Atluri1998}, with
-strong-type variants developed more recently~\cite{Hillman2021}. The third does not prescribe a
-condition at all but corrects the truncated kernel summation near the boundary so that the
-operator stays consistent there, through Shepard normalisation~\cite{Shepard1968}, corrective
-and reproducing-kernel formulations~\cite{Chen1999,Liu1995}, and the boundary truncation-error
-analysis of Quinlan et al.~\cite{Quinlan2006}; this strand is the closest ancestor of the
-renormalised operators used here, though it restores consistency without prescribing the
-boundary value or flux. The present closure is algebraic in this sense but differs from all
-three: it embeds the boundary condition neither in the trial space nor in a variational form
-requiring background integration, but directly into a strong-form collocation row, organised by
-condition type, with a Neumann flux entering the right-hand side and a Dirichlet or Robin value
-the diagonal of the same row. The boundary is detected from the point cloud, and the closure
-carries no tuning parameter.
+A separate line of work imposes the boundary condition in algebraic form, rather than extending the domain with extra geometry.
+Here, we describe three main categories.
+First, the formulation incorporates the condition directly into the trial space from the start, so that every valid field satisfies it by construction.
+For example, the R-function method builds boundary-conforming solution structures from implicit geometry~\cite{Shapiro2007,ShapiroTsukanov1999}.
+In weighted B-splines, a distance function to the boundary weights a B-spline basis~\cite{Hoellig2003}.
+This same concept underlies the exact imposition of boundary conditions in neural and physics-informed solvers using distance fields~\cite{Lagaris1998,SukumarSrivastava2022}.
+In the second category, the formulation injects the boundary condition into the variational form instead of the basis.
+In methods like element-free Galerkin, the moving-least-squares shape functions lack the Kronecker-delta property.
+This lack prevents pinning nodal values directly~\cite{Belytschko1994,FernandezMendez2004}.
+Consequently, researchers enforce essential conditions weakly through Nitsche's method~\cite{Nitsche1971} or a penalty method~\cite{Atluri1998}, though strong-type variants have also appeared recently~\cite{Hillman2021}.
+In the third category, one does not prescribe a boundary condition at all.
+Instead, correcting the truncated kernel summation near the boundary keeps the operator consistent.
+This includes Shepard normalisation~\cite{Shepard1968}, corrective or reproducing-kernel formulations~\cite{Chen1999}, and the boundary truncation-error analysis of Quinlan et al.~\cite{Quinlan2006}.
+This third category is the closest ancestor to the renormalised operators, though the method restores consistency without prescribing the actual boundary value or flux.
+The proposed closure is algebraic in a similar sense, but it differs from all three categories.
+The boundary condition is not incorporated into the trial space, nor is background integration in a variational form required.
+Instead, the condition is integrated directly into a strong-form collocation row.
+The type of the condition organises this row.
+A Neumann flux goes to the right-hand side, while a Dirichlet or Robin value enters the diagonal of the same row.
+Furthermore, the algorithm detects the boundary from the point cloud, requiring no tuning parameters.
 
-The contribution of this work is a boundary closure for the renormalised operators
-of~\cite{Basic2018} with three properties not jointly provided by the methods reviewed above.
-It is \emph{unified}: the interior, the Neumann boundary, the free surface and the contact lines
-are assembled by one kernel on a single code path, distinguished only by the boundary-condition
-type, a Neumann flux entering the right-hand side and a Dirichlet or Robin value the diagonal of
-the same collocation row. It is \emph{geometry-detected}: the free surface is identified from the
-support-deficiency geometry of the cloud, without surface particles and without a level set. It
-is \emph{parameter-free}: the free-surface enforcement strength cancels to the total kernel
-weight, a geometric quantity, and a parameter-free activation leaves the interior nodes
-untouched, so the closure introduces no penalty, threshold, or tuning length. A complementary
-algebraic-ghost closure removes the accuracy bottleneck of the flux-only Neumann treatment by
-completing the truncated boundary stencil with reflected samples that are formed on the fly and
-never stored, and so add no unknowns. As a smaller supporting result, the single-sum interior
-operator adopted here, which we call the \emph{smooth-naive} operator, bridges the naive and sum
-versions of~\cite{Basic2018} through a trace-based normalisation and retains the corrected
-summation of the latter in a single neighbour loop. The scope is restricted to the linear
-elliptic Poisson problem; applications and extensions are discussed in the conclusions.
+The main contribution of this work is a boundary closure for the renormalised operators of~\cite{Basic2018}.
+We provide three properties that are not found conjoined in existing methods.
+First, it is unified. A single kernel assembles the interior, the Neumann boundary, the free surface, and the contact lines on one code path.
+Only the type of boundary condition distinguishes these cases.
+A Neumann flux enters the right-hand side, and a Dirichlet or Robin value enters the diagonal of the same collocation row.
+Second, it is geometry-detected.
+The free surface is identified from the support-deficiency geometry of the cloud, requiring no surface particles and avoiding level sets.
+Third, it is parameter-free.
+The enforcement strength cancels out to the total kernel weight, which is a purely geometric quantity.
+A parameter-free activation function leaves the interior nodes untouched.
+Thus, no penalty parameters, thresholds, or tuning lengths are introduced.
+A complementary algebraic-ghost closure is also introduced.
+This closure resolves the accuracy bottleneck of the flux-only Neumann treatment.
+It does so by completing the truncated boundary stencil using reflected samples.
+The algorithm forms these samples on the fly and never stores them globally, adding no extra unknowns.
+As a smaller supporting result, a single-sum interior operator, termed the smooth-naive operator, is presented.
+It bridges the naive and sum versions of~\cite{Basic2018} using a trace-based normalisation.
+It preserves the corrected summation of the sum version while using a single neighbour loop.
+The scope is restricted to the linear elliptic Poisson problem.
+Applications and extensions are discussed in the conclusions.
 
-The paper is organised as follows. Section~\ref{sec:operators} recalls the renormalised
-operators. Section~\ref{sec:closure} derives the boundary closure, comprising the
-boundary-condition-by-type principle, the Neumann projection and its corner treatment, the
-algebraic-ghost closure, the free-surface detection, and a short consistency remark.
-Section~\ref{sec:opresults} reports the pointwise operator-approximation results, including
-boundary and corner rows. Section~\ref{sec:bvp} reports the boundary-value-problem benchmarks
-and the comparison with the GFDM baseline. Section~\ref{sec:hodge} applies the closure to
-the Helmholtz--Hodge decomposition and examines the operators' non-adjointness.
-Section~\ref{sec:cost} discusses computational aspects, and Section~\ref{sec:concl} concludes.
-
-% =============================================================================
 \section{Meshless operators}
 \label{sec:operators}
 
-Three meshless second-derivative operators are used in this work and are set out in this
-section in a common notation: the renormalised differencing operator of~\cite{Basic2018},
-abbreviated LDD after the Lagrangian differencing dynamics of~\cite{Basic2022}, on which the
-boundary closure of Section~\ref{sec:closure} is built; a generalised finite difference (GFDM)
-operator used as a second-order baseline; and the second-order renormalised operator
-of~\cite{Asai2023}, which we re-express in a kernel-gradient-free form consistent with the
-present framework. For a point cloud $\Omega$ with nodal spacing $\Delta$, each node $i$
-interacts with neighbours $j$ within a compact support radius $h=\kappa\Delta$ through a kernel
-$W_{ij}=W(|\xij|,h)$, where $\xij=\mathbf{x}_j-\mathbf{x}_i$ and $f_{ij}=f_j-f_i$. The kernel
-used throughout is the poly6 function
-\begin{equation}
-  W(r,h)=\max\!\big(0,\;1-q^2\big)^3,\qquad q=r/h,
-  \label{eq:kernel}
-\end{equation}
-with $\kappa=2.5$ by default.
+In this section, we describe the three meshless second-derivative operators used in this study.
+We adopt a unified notation.
+The first is the renormalised differencing operator of~\cite{Basic2018}, which we abbreviate as LDD, after the Lagrangian differencing dynamics framework~\cite{Basic2022}.
+We build the new boundary closure in Section~\ref{sec:closure} directly on this operator.
+The second is a generalised finite difference (GFDM) operator, which serves as a second-order baseline.
+The third is the second-order renormalised operator of~\cite{Asai2023}, which we re-express in a kernel-gradient-free form to match the present framework.
+Consider a point cloud $\Omega$ with nodal spacing $\Delta$.
+Each node $i$ interacts with neighbours $j$ within a compact support radius $h=\kappa\Delta$.
+A kernel function $W_{ij}=W(|\xij|,h)$ governs this interaction, where we define the relative offset as $\xij=\mathbf{x}_j-\mathbf{x}_i$ and the field difference as $f_{ij}=f_j-f_i$.
+For all tests, we choose the poly6 function as the kernel:
 
 \subsection{Lagrangian Differencing Dynamics (LDD)}
 \label{sec:op-ldd}
 
-The renormalised operators of~\cite{Basic2018} consume the kernel weights and renormalise
-them, and are therefore kernel-agnostic in the sense made precise below. From the kernel are
-formed the
-support-deficiency vector $\oi$, the total weight $S_i$, the second-moment renormalisation
-tensor $\Mi$ and its inverse $\Bi$,
+In the renormalised operators of~\cite{Basic2018}, the formulation consumes and renormalises the raw kernel weights.
+This makes the operators kernel-agnostic in a sense we will make precise.
+We define several local quantities using the kernel:
+These are the support-deficiency vector $\oi$, the total weight $S_i$, the second-moment renormalisation tensor $\Mi$, and its inverse $\Bi$:
 \begin{align}
   \oi &= \sum_j W_{ij}\,\xij, \label{eq:o}\\
   S_i &= \sum_j W_{ij}, \label{eq:Stot}\\
   \Mi &= \sum_j W_{ij}\,\xij\otimes\xij, \label{eq:M}\\
   \Bi &= \Mi^{-1}. \label{eq:B}
 \end{align}
-The vector $\oi$ vanishes for symmetric support and points inward near a boundary, and $\Bi$
-is symmetric positive-definite whenever $\Mi$ has full rank, which requires at least $d+1$
-non-degenerate neighbours. The renormalised gradient is
+
+The vector $\oi$ vanishes when the support is perfectly symmetric.
+Near a boundary, it points inward.
+The inverse moment tensor $\Bi$ is symmetric and positive-definite, provided that $\Mi$ has full rank.
+This condition requires at least $d+1$ non-degenerate neighbours.
+We write the renormalised gradient as:
 \begin{equation}
   \gradop{f}_i=\Bi\sum_j W_{ij}\,f_{ij}\,\xij,
   \label{eq:grad}
 \end{equation}
-which is exact for linear fields on any cloud. For $f=\mathbf a\cdot\mathbf x+b$ the
-difference is $f_{ij}=\mathbf a\cdot\xij$, and by the definition of $\Mi$ in Eq.~\eqref{eq:M},
+
+which remains exact for linear fields on any point cloud.
+We can easily verify this linear exactness.
+For a linear field $f=\mathbf a\cdot\mathbf x+b$, the difference is $f_{ij}=\mathbf a\cdot\xij$.
+Using the definition of $\Mi$ in Eq.~\eqref{eq:M}, we evaluate the gradient:
 \begin{align}
   \gradop{f}_i
   &=\Bi\sum_j W_{ij}(\mathbf a\cdot\xij)\,\xij \notag\\
@@ -237,303 +195,298 @@ difference is $f_{ij}=\mathbf a\cdot\xij$, and by the definition of $\Mi$ in Eq.
    =\Bi\Mi\mathbf a=\mathbf a,
   \label{eq:gradexact}
 \end{align}
-the renormalisation by $\Bi=\Mi^{-1}$ being precisely what cancels the unbalanced moments of
-a truncated support.
 
-The Laplacian is again obtained from a Taylor expansion in which the first-order term is
-removed by subtracting the reconstructed gradient. Two members of the renormalised family
-derived in~\cite{Basic2018} provide the context. The \emph{naive version} weights each
-neighbour by the reciprocal squared distance,
+Here, the renormalisation by $\Bi=\Mi^{-1}$ cancels out the unbalanced moments that a truncated support causes.
+
+We obtain the Laplacian from a Taylor expansion.
+Subtracting the reconstructed gradient removes the first-order term.
+Two existing members of the renormalised family from~\cite{Basic2018} provide useful context.
+In the naive version, we weight each neighbour by the reciprocal squared distance:
 \begin{equation}
   \lap{f}_i^{\mathrm{naive}}=2d\sum_j \frac{W_{ij}}{|\xij|^2}\big(f_{ij}-\xij\cdot\gradop{f}_i\big),
   \label{eq:naive2017}
 \end{equation}
-which is accurate on regular clouds but is sensitive to close neighbours, since a single near
-pair makes $1/|\xij|^2$ large. The \emph{sum version} removes that sensitivity by replacing
-the per-neighbour weight with a single self-normalising ratio,
+
+This naive version works well on regular clouds.
+However, it exhibits high sensitivity to close neighbours.
+A single close pair can make the term $1/|\xij|^2$ extremely large, causing numerical issues.
+The sum version resolves this sensitivity by replacing individual weights with a single self-normalising ratio:
 \begin{equation}
   \lap{f}_i^{\mathrm{sum}}=2d\,\frac{\sum_j W_{ij}\,w_{ij}\,f_{ij}}{\sum_j W_{ij}\,w_{ij}\,|\xij|^2},
-  \qquad w_{ij}=1-\xij\cdot\Bi\oi,
   \label{eq:sum2017}
 \end{equation}
-whose denominator is the operator's own action on $\tfrac12|\mathbf x|^2$ and which is
-therefore exact for the isotropic quadratic by construction.
 
-The operator introduced here, which we name the \emph{smooth-naive} operator, descends from the
-naive form, Eq.~\eqref{eq:naive2017}, by smoothing its normalisation. The per-neighbour factor
-$2d/|\xij|^2$ is replaced by a single tensor quantity built from the already-computed
-renormalisation tensor,
+where we define the correction weight as $w_{ij}=1-\xij\cdot\Bi\oi$. The denominator is the operator's own action on $\tfrac12|\mathbf x|^2$, which makes it exact for the isotropic quadratic by construction.
+
+We introduce a new operator, which we name the smooth-naive operator.
+We derive it from the naive form in Eq.~\eqref{eq:naive2017} but use a smoothed normalisation.
+Instead of the per-neighbour factor $2d/|\xij|^2$, we use a single tensor quantity.
+We build this quantity directly from the inverse moment tensor:
 \begin{equation}
   N_i=\frac{2}{d}\,\mathrm{tr}\,\Bi.
   \label{eq:N}
 \end{equation}
-It was found that $\mathrm{tr}\,\Bi$ represents the normalisation more smoothly than the
-per-neighbour reciprocal, being insensitive to individual close pairs. The factor $2/d$
-follows from the spherical-mean identity $\nabla^2 f=\lim_{r\to0}\frac{2d}{r^2}(\bar f_r-f)$
-and gives the correct second-derivative magnitude in any dimension, as confirmed by a
-three-dimensional constant-Laplacian test in Section~\ref{sec:opresults}. With this
-normalisation the corrected second difference reads
+
+The scaling factor $2/d$ comes from the spherical-mean identity:
+\begin{equation}
+  \nabla^2 f=\lim_{r\to0}\frac{2d}{r^2}(\bar f_r-f),
+  \label{eq:spherical_mean}
+\end{equation}
+and yields the correct second-derivative magnitude in any dimension.
+A three-dimensional constant-Laplacian test in Section~\ref{sec:opresults} confirms this scaling.
+Using this normalisation, we write the corrected second difference as:
 \begin{equation}
   \lap{f}_i=N_i\sum_j W_{ij}\big(f_{ij}-\xij\cdot\gradop{f}_i\big).
   \label{eq:lapnaive}
 \end{equation}
-Because $\gradop{f}_i$ does not depend on $j$, the offset $\sum_j W_{ij}\xij=\oi$ is factored
-out of the second term, giving $\sum_j W_{ij}\,\xij\cdot\gradop{f}_i=\oi\cdot\gradop{f}_i$.
-Substituting Eq.~\eqref{eq:grad} and using the symmetry of $\Bi$,
+
+Note that $\gradop{f}_i$ does not depend on the neighbour index $j$.
+Therefore, we can factor the support offset $\sum_j W_{ij}\xij=\oi$ out of the second term.
+This simplification yields $\sum_j W_{ij}\,\xij\cdot\gradop{f}_i=\oi\cdot\gradop{f}_i$.
+Substituting Eq.~\eqref{eq:grad} and using the symmetry of $\Bi$ yields the following:
 \begin{align}
   \oi\cdot\gradop{f}_i
   &=\oi\cdot\Bi\sum_j W_{ij}\,f_{ij}\,\xij \notag\\
   &=\sum_j W_{ij}\,f_{ij}\,(\xij\cdot\Bi\oi),
   \label{eq:collapse}
 \end{align}
-so the double sum collapses to the single-sum renormalised Laplacian
+
+Consequently, the double sum collapses, yielding a single-sum renormalised Laplacian:
 \begin{equation}
   \lap{f}_i=N_i\sum_j W_{ij}\,f_{ij}\,(1-\xij\cdot\Bi\oi)
            \equiv N_i\sum_j W_{ij}\,f_{ij}\,w_{ij}.
   \label{eq:lap}
 \end{equation}
 
-Equation~\eqref{eq:lap} connects the two operators of~\cite{Basic2018}. Its summand
-$W_{ij}w_{ij}f_{ij}$ is the numerator of the sum version, Eq.~\eqref{eq:sum2017}, while its
-normalisation $N_i$ is the smoothed descendant of the naive weighting,
-Eq.~\eqref{eq:naive2017}. The smooth-naive operator therefore retains the corrected,
-offset-shifted summation of the sum version, and evaluates it in a single neighbour loop without
-the second summation. The three normalisations moreover coincide on isotropic support, where
-$w_{ij}\to1$ and $\Mi=\tfrac1d\big(\sum_j W_{ij}|\xij|^2\big)\mathbf I$, giving
+Equation~\eqref{eq:lap} bridges the two older formulations from~\cite{Basic2018}.
+Its summand $W_{ij}w_{ij}f_{ij}$ matches the numerator of the sum version in Eq.~\eqref{eq:sum2017}.
+Meanwhile, its normalisation $N_i$ behaves as a smoothed version of the naive weighting in Eq.~\eqref{eq:naive2017}.
+As a result, the smooth-naive operator retains the corrected, offset-shifted summation.
+It computes everything in a single neighbour loop, avoiding the need for a second summation pass.
+Furthermore, the three normalisations coincide when the support is isotropic.
+Under isotropic conditions, we obtain $w_{ij}\to1$ and $\Mi=\tfrac1d\big(\sum_j W_{ij}|\xij|^2\big)\mathbf I$.
+This leads to the following relation:
 \begin{equation}
   N_i^{\mathrm{den}}\equiv\frac{2d}{\sum_j W_{ij}\,w_{ij}\,|\xij|^2}
   \;\xrightarrow{\ \text{isotropic}\ }\;
   \frac{2d}{\sum_j W_{ij}\,|\xij|^2}=\frac{2}{d}\,\mathrm{tr}\,\Bi=N_i,
   \label{eq:Nden}
 \end{equation}
-the naive, sum and smooth-naive operators all reducing to the same expression on a regular
-lattice and differing only under anisotropy. The self-normalising denominator $N_i^{\mathrm{den}}$
-of Eq.~\eqref{eq:Nden} is the normalisation of the \emph{sum} operator of~\cite{Basic2018};
-applied to the same summand it is retained here as the more accurate variant. Being exact for
-$|\mathbf x|^2$, the sum operator is between $8$ and $15\%$ more accurate than the smooth-naive
-operator under disorder, with the edge widening as the chaos level grows; the sum-to-smooth-naive
-error ratio falls from $1.00$ on a lattice to $0.73$ at chaos $80\%$, as shown in
-Section~\ref{sec:bvp}, Fig.~\ref{fig:jitter}. The smooth-naive operator, which avoids the
-denominator sum, is the default, and the sum operator is offered as a more accurate refinement.
+Thus, the naive, sum, and smooth-naive operators all simplify to the same expression on a regular lattice.
+They differ only when support anisotropy is present.
+The denominator $N_i^{\mathrm{den}}$ in Eq.~\eqref{eq:Nden} normalises the sum operator of~\cite{Basic2018}.
+We retain this denominator normalisation as a more accurate alternative.
+Because it is exact for $|\mathbf x|^2$, the sum operator is about $8$ to $15\%$ more accurate than the smooth-naive version under particle disorder.
+This advantage grows as the chaos level increases.
+Specifically, the sum-to-smooth-naive error ratio falls from $1.00$ on a regular lattice to $0.73$ at $80\%$ chaos, as we show in Section~\ref{sec:bvp} and Fig.~\ref{fig:jitter}.
+We use the smooth-naive operator as the default because we avoid the denominator sum.
+The sum operator remains available as a more accurate refinement.
 
-The correction weight renders Eq.~\eqref{eq:lap} linear-exact on any cloud, including the
-truncated rows that occur at a boundary. For $f=\mathbf a\cdot\mathbf x+b$ the field
-difference is again $f_{ij}=\mathbf a\cdot\xij$, and
+The correction weight makes Eq.~\eqref{eq:lap} exact for linear fields on any point arrangement.
+This holds even for the truncated supports found at boundaries.
+To see why, let $f=\mathbf a\cdot\mathbf x+b$, which gives the difference $f_{ij}=\mathbf a\cdot\xij$.
+We substitute this into the Laplacian equation:
 \begin{align}
   \lap{f}_i
   &=N_i\Big[\sum_j W_{ij}(\mathbf a\cdot\xij)-\sum_j W_{ij}(\mathbf a\cdot\xij)(\xij\cdot\Bi\oi)\Big] \notag\\
-  &=N_i\big[\mathbf a\cdot\oi-\mathbf a\cdot\Mi\Bi\oi\big]=0,
+  &=N_i\big[\mathbf a\cdot\oi-\mathbf a\cdot\Mi\Bi\oi\big]=0.
   \label{eq:lapconsist}
 \end{align}
-since $\Mi\Bi=\mathbf I$, and the two terms cancel on any support, symmetric or truncated.
-Readers interested in the rigorous derivation and the convergence theory of these operators
-are referred to~\cite{Basic2018,Lanson2008a,Vila1999}.
+Since $\Mi\Bi=\mathbf I$, the two terms cancel out.
+This cancellation occurs on any support, whether symmetric or truncated.
+We refer readers to~\cite{Basic2018,Lanson2008a,Vila1999} for a rigorous derivation and convergence analysis of these operators.
 
-It should be noted that Eq.~\eqref{eq:lap} is linear-consistent but not, in general,
-second-order consistent on a disordered cloud. On a regular lattice its pointwise truncation
-error is $O(\Delta^2)$, whereas under fixed-relative jitter it is $O(1)$ and does not vanish
-as $\Delta\to0$. The Poisson solution nonetheless converges, a behaviour known as
-supraconvergence, because the $O(1)$ pointwise error is the discrete divergence of a
-consistent flux and is damped by the global solve. This behaviour was established
-in~\cite{Basic2018}. It frames the accuracy results of the present study and is revisited in
-Section~\ref{sec:remark}.
+Equation~\eqref{eq:lap} is linear-consistent.
+However, it is generally not second-order consistent on a disordered cloud.
+Its pointwise truncation error is $O(\Delta^2)$ on a regular lattice.
+Yet, under fixed-relative jitter, this error becomes $O(1)$ and does not vanish as $\Delta\to0$.
+In spite of this, the global Poisson solution still converges.
+We call this phenomenon supraconvergence.
+It occurs because the $O(1)$ pointwise error is the discrete divergence of a consistent flux, which the global system solve effectively damps out.
+\cite{Basic2018} established this behaviour.
+It serves as the framework for the accuracy results, and we revisit it in Section~\ref{sec:remark}.
 
 \subsection{Generalised finite differences (GFDM)}
 \label{sec:op-gfdm}
 
-As a second-order reference we use a generalised finite difference operator of the
-finite-pointset type~\cite{Benito2001,Kuhnert2001,Tiwari2003}. At each node the full quadratic
-Taylor basis on the neighbour offsets,
+We use a generalised finite difference operator of the finite-pointset type as a second-order reference~\cite{Benito2001,Kuhnert2001,Tiwari2003}.
+At each node, we construct a full quadratic Taylor basis on the neighbour offsets:
 \begin{equation}
   \mathbf p_{ij}=\big[\,x_{ij},\ y_{ij},\ \tfrac12 x_{ij}^2,\ x_{ij}y_{ij},\ \tfrac12 y_{ij}^2\,\big]^\top,
   \label{eq:gfdmbasis}
 \end{equation}
-is fitted to the field differences $f_{ij}$ by weighted least squares with the same kernel
-weights $W_{ij}$, and the Laplacian is read off as the sum of the two pure second-derivative
-coefficients,
+We fit this basis to the field differences $f_{ij}$ using weighted least squares with the kernel weights $W_{ij}$.
+From this fit, we read off the Laplacian as the sum of the two pure second-derivative coefficients:
 \begin{equation}
   \lap{f}_i^{\mathrm{GFDM}}=\mathbf e^\top\big(\mathbf P^\top\mathbf W\mathbf P\big)^{-1}
                             \mathbf P^\top\mathbf W\mathbf f,
-  \qquad \mathbf e=[\,0,0,1,0,1\,]^\top,
   \label{eq:gfdm}
 \end{equation}
-with $\mathbf P$ the matrix of basis rows $\mathbf p_{ij}^\top$, $\mathbf W=\mathrm{diag}(W_{ij})$
-and $\mathbf f=(f_{ij})_j$. The operator is exact for quadratics and hence second-order
-consistent in the interior, on regular and disordered clouds alike, at the cost of a
-$5\times5$ local solve in two dimensions and a requirement of at least five well-spread
-neighbours; on a regular grid it reduces to the standard five-point stencil. The Neumann flux
-is imposed as an exact equality constraint through a local Karush--Kuhn--Tucker saddle system,
-in the manner of the finite-pointset constraint row~\cite{Kuhnert2001,Tiwari2003}, and a soft
-penalty-flux variant, shown not to converge in Section~\ref{sec:nb}, is referred to as the
-penalty form.
+where we define the selection vector as $\mathbf e=[\,0,0,1,0,1\,]^\top$. Here, $\mathbf P$ is the matrix of basis rows $\mathbf p_{ij}^\top$, $\mathbf W=\mathrm{diag}(W_{ij})$, and $\mathbf f=(f_{ij})_j$.
+This operator is exact for quadratics.
+It is therefore second-order consistent in the interior on both regular and disordered clouds.
+However, this comes at the cost of solving a $5\times5$ local system in two dimensions.
+It also requires at least five well-spaced neighbours.
+On a regular grid, it simplifies to the standard five-point stencil.
+We impose the Neumann flux as an exact equality constraint using a local Karush-Kuhn-Tucker saddle system, following the finite-pointset constraint approach~\cite{Kuhnert2001,Tiwari2003}.
+We also test a soft penalty-flux variant, which we refer to as the penalty form, and show in Section~\ref{sec:nb} that it fails to converge.
 
 \subsection{Second-order operators in LDD form}
 \label{sec:op-fi}
 
-The cross-term free LDD operator in Section~\ref{sec:op-ldd} are linear-consistent. 
-In a systematic taxonomy of renormalised second-derivative models, Asai et
-al.~\cite{Asai2023} identify their \emph{Block Diagonal} operator, equivalent there to the
-corrected Laplacian of Schwaiger~\cite{Schwaiger2008} and to the present family, with their
-\emph{Naive} variant coinciding with the Taylor-series form of Lian et al.~\cite{Lian2021}.
-Full second-order pointwise consistency under disorder is recovered only by their \emph{Full
-Inverse} operator, which reinstates the cross-derivative coupling that the block-diagonal
-reduction drops, in common with the consistent meshless second-derivative constructions of
-Espa\~nol and Revenga~\cite{Espanol2003}, the least-squares moving-particle method of Tamai
-and Koshizuka~\cite{Tamai2014}, and the GFDM operator of Section~\ref{sec:op-gfdm}. The
-terminology is not uniform across the literature, i.e. what~\cite{Asai2023} call Block Diagonal,
-is the variant termed \emph{Full Inverse} in the LDD line of work~\cite{Basic2018,Basic2022}.
+The cross-term free LDD operator described in Section~\ref{sec:op-ldd} is linear-consistent.
+Asai et al.~\cite{Asai2023} proposed a systematic taxonomy of renormalised second-derivative models.
+In that work, they identify a Block Diagonal operator.
+This is equivalent to the corrected Laplacian of Schwaiger~\cite{Schwaiger2008} and to the present family.
+The Naive variant, on the other hand, coincides with the Taylor-series form of Lian et al.~\cite{Lian2021}.
+To recover full second-order pointwise consistency under particle disorder, we must use the Full Inverse operator.
+In this operator, we reinstate the cross-derivative coupling that the block-diagonal reduction dropped.
+This is similar to other consistent meshless second-derivative models, such as those by Espa\~nol and Revenga~\cite{Espanol2003}, the least-squares moving-particle method of Tamai and Koshizuka~\cite{Tamai2014}, and the GFDM operator in Section~\ref{sec:op-gfdm}.
+Unfortunately, the terminology in this area is not uniform.
+What Asai et al.~\cite{Asai2023} call Block Diagonal is actually the variant that the LDD literature terms Full Inverse~\cite{Basic2018,Basic2022}.
 
-This operator attains second order by fitting the full set of second derivatives,
-including the cross term, rather than the trace alone. It is written in terms of a
-corrected kernel gradient $\widetilde{\nabla} W_{ij}$ and the weighting
-$\mathbf r_{ij}\!\cdot\!\widetilde{\nabla} W_{ij}/|\mathbf r_{ij}|^4$. The present framework,
-however, never differentiates the kernel of the gradient~\eqref{eq:grad} and the
-Laplacian~\eqref{eq:lap}, that use only the scalar weight $W_{ij}$ and the renormalisation $\Bi$. We
-therefore apply the idea to an equivalent, kernel-gradient-free form of the operator, expressed in the same
-renormalise-by-$\Bi$ idiom as a single weighted least-squares fit. Collect the second
-derivatives in $\mathbf u_i=[\,\partial^2_{xx}f,\ \partial^2_{yy}f,\ 2\,\partial^2_{xy}f\,]^\top$
-and the quadratic offsets in the basis
-$\mathbf s_{ij}=[\,x_{ij}^2,\ y_{ij}^2,\ x_{ij}y_{ij}\,]^\top$. The renormalised
-gradient~\eqref{eq:grad} is the stencil $\gradop{f}_i=\sum_j\mathbf c_{ij}f_{ij}$ with
-$\mathbf c_{ij}=W_{ij}\Bi\xij$. Removing it from the second difference leaves the second-order
-remainder
+This operator achieves second-order accuracy by fitting the full set of second derivatives, including the cross term, rather than just the trace.
+However, we never differentiate the kernel in this framework.
+The gradient in Eq.~\eqref{eq:grad} and the Laplacian in Eq.~\eqref{eq:lap} rely only on the scalar weight $W_{ij}$ and the renormalisation matrix $\Bi$.
+Therefore, we adapt this second-order concept to a kernel-gradient-free form.
+We express it as a single weighted least-squares fit using the same renormalise-by-$\Bi$ approach.
+We collect the second derivatives in a vector $\mathbf u_i=[\,\partial^2_{xx}f,\ \partial^2_{yy}f,\ 2\,\partial^2_{xy}f\,]^\top$.
+We also collect the quadratic offsets in the basis $\mathbf s_{ij}=[\,x_{ij}^2,\ y_{ij}^2,\ x_{ij}y_{ij}\,]^\top$.
+We represent the renormalised gradient in Eq.~\eqref{eq:grad} with the stencil $\gradop{f}_i=\sum_j\mathbf c_{ij}f_{ij}$, where $\mathbf c_{ij}=W_{ij}\Bi\xij$.
+Subtracting this gradient from the second difference leaves a second-order remainder:
 \begin{equation}
-  g_{ij}\equiv f_{ij}-\xij\!\cdot\!\gradop{f}_i=\tfrac12\,\hat{\mathbf s}_{ij}\!\cdot\!\mathbf u_i,
+  g_{ij}\equiv f_{ij}-\xij\!\cdot\!\gradop{f}_i=\tfrac12\,\hat{\mathbf s}_{ij}\!\cdot\!\mathbf u_i.
   \label{eq:fi-rem}
 \end{equation}
-exact for quadratics, in which the basis must be \emph{corrected} for the second-derivative
-content that the renormalised gradient itself carries,
+In this equation, we must correct the basis for the second-derivative content that the renormalised gradient itself carries:
 \begin{equation}
-  \hat{\mathbf s}_{ij}=\mathbf s_{ij}-\mathbf C_i\,\xij,\qquad
-  \mathbf C_i=\sum_j W_{ij}\,\mathbf s_{ij}\,(\Bi\xij)^\top.
+  \hat{\mathbf s}_{ij}=\mathbf s_{ij}-\mathbf C_i\,\xij,
   \label{eq:fi-corr}
 \end{equation}
-The term $\mathbf C_i\xij$ is the kernel-gradient-free counterpart of the $R_{(2)}$ correction
-of~\cite{Asai2023}; omitting it collapses the fit to the linear-consistent class and the second
-order is lost under disorder. The coefficients follow from the weighted normal equations
+where we define the moment-offset correction matrix as:
+\begin{equation}
+  \mathbf C_i=\sum_j W_{ij}\,\mathbf s_{ij}\,(\Bi\xij)^\top.
+  \label{eq:C_i_def}
+\end{equation}
+The term $\mathbf C_i\xij$ acts as the kernel-gradient-free counterpart to the $R_{(2)}$ correction of~\cite{Asai2023}.
+If we omit this term, the fit collapses back to the linear-consistent class, and we lose second-order accuracy under disorder.
+We solve the coefficients from the weighted normal equations:
 \begin{equation}
   \mathbf M_i^{\mathrm{FI}}\,\mathbf u_i=2\sum_j W_{ij}\,\hat{\mathbf s}_{ij}\,g_{ij},
-  \qquad
-  \mathbf M_i^{\mathrm{FI}}=\sum_j W_{ij}\,\hat{\mathbf s}_{ij}\otimes\hat{\mathbf s}_{ij},
   \label{eq:fi-solve}
 \end{equation}
-a $3\times3$ system in two dimensions, and the Laplacian is the trace
-$\lap{f}_i^{\mathrm{FI}}=u_{i,1}+u_{i,2}$. Dropping the cross column of $\mathbf s_{ij}$ recovers
-the block-diagonal, linear-consistent operator, and hence Eq.~\eqref{eq:lap}, which is the
-equivalence noted above. The construction uses only $W_{ij}$, $\Bi$ and the offsets, with no
-kernel derivative; in practice the offsets are scaled by their root-mean-square length to
-condition $\mathbf M_i^{\mathrm{FI}}$. This form was verified against the analytic moment
-integrals of~\cite{Asai2023}, recovering their uniform-cloud values to the quadrature error,
-and against pointwise second-order convergence on disordered clouds.
+where we define the second-order moment matrix as $\mathbf M_i^{\mathrm{FI}}=\sum_j W_{ij}\,\hat{\mathbf s}_{ij}\otimes\hat{\mathbf s}_{ij}$. This is a small $3\times3$ system in two dimensions.
+We then compute the Laplacian as the trace $\lap{f}_i^{\mathrm{FI}}=u_{i,1}+u_{i,2}$.
+If we drop the cross-term column from $\mathbf s_{ij}$, we recover the block-diagonal, linear-consistent operator, which matches Eq.~\eqref{eq:lap}.
+This is the equivalence we noted earlier.
+This construction uses only $W_{ij}$, $\Bi$, and the offsets, completely avoiding kernel derivatives.
+In practice, we scale the offsets by their root-mean-square length to improve the conditioning of $\mathbf M_i^{\mathrm{FI}}$.
+We verified this formulation against the analytic moment integrals of~\cite{Asai2023}, recovering their uniform-cloud values up to quadrature error.
+We also confirmed pointwise second-order convergence on disordered clouds.
 
-The present work deliberately retains the original linear-consistent LDD operator and shows that, once
-the boundary is closed correctly, it is the boundary closure and not the interior order that
-governs the realised accuracy of the solution. The interior operators from this section and the
-boundary closure to be introduced are complementary and could be combined, as summarised in
-Table~\ref{tab:schemes}.
+In this work, we deliberately retain the original linear-consistent LDD operator.
+We show that when we close the boundary correctly, the boundary closure and not the interior order governs the final accuracy of the solution.
+The interior operators and the boundary closure we introduce here are complementary and combine easily, as we summarise in Table~\ref{tab:schemes}.
 
-% =============================================================================
 \section{Boundary closure}
 \label{sec:closure}
 
 \subsection{Boundary conditions by type}
 \label{sec:bytype}
 
-The organising principle of the closure is that the type of the boundary condition, not the
-physical quantity it constrains, determines the algebra of its integration into
-Eq.~\eqref{eq:lap}. A Neumann condition prescribes a flux $\nabla p\cdot\mathbf n=g$. Since a
-flux is a known datum independent of the unknown nodal value, it is moved to the right-hand
-side. A Dirichlet or Robin condition prescribes a value, or a value-dependent flux. Since the
-constraint involves the unknown nodal value, it contributes to the diagonal self-interaction
-term as well as to the right-hand side. Two independent classifications are at work, and the
-closure keeps them separate. The \emph{enforcement algebra} just described, flux to the
-right-hand side and value to the diagonal, is one axis; the boundary \emph{representation},
-prescribed or detected from the cloud, is the other. The two closures derived below are named
-for the algebra, a \emph{flux closure} and a \emph{value closure}, while the wall and the free
-surface are physical instances of them, the free surface additionally being detected rather than
-prescribed. The generalised Robin condition $\nabla p\cdot\mathbf n+\alpha p=\gamma$ unifies the
-algebra: the flux closure is the limit $\alpha\to0$ and the value closure the limit
-$\alpha\to\infty$, a finite $\alpha$ splitting the datum between the two
-(Section~\ref{sec:b3}). The pairing of the wall with a flux and the free surface with a value is
-therefore specific to the pressure problem and reverses for the velocity field, where the
-no-slip wall is a value closure and the stress-free surface a flux closure
-(Section~\ref{sec:concl}). The unified assembled row is
+A simple organising principle underlies the boundary closure.
+The type of boundary condition, rather than the physical quantity it represents, determines the algebra of its integration into Eq.~\eqref{eq:lap}.
+A Neumann condition prescribes a flux $\nabla p\cdot\mathbf n=g$.
+Because this flux is a known datum independent of the unknown nodal value, we move it to the right-hand side.
+A Dirichlet or Robin condition prescribes a value, or a value-dependent flux.
+Since this constraint involves the unknown nodal value itself, it must contribute to the diagonal self-interaction term as well as to the right-hand side.
+We keep two independent classifications separate.
+In the first axis, we send fluxes to the right-hand side and values to the diagonal.
+In the second axis, we either prescribe boundary representations or detect them from the point cloud.
+We name the two closures derived below after their algebra: the flux closure and the value closure.
+Physically, solid walls and free surfaces are examples of these closures.
+In addition, we detect the free surface geometrically rather than prescribing it.
+The generalised Robin condition $\nabla p\cdot\mathbf n+\alpha p=\gamma$ unifies this algebraic view.
+The flux closure is the limit as $\alpha\to0$, whereas the value closure is the limit as $\alpha\to\infty$.
+A finite value of $\alpha$ splits the boundary datum between the diagonal and the right-hand side, as we show in Section~\ref{sec:b3}.
+Thus, pairing a wall with a flux and a free surface with a value is specific to the pressure Poisson problem.
+For the velocity field, this pairing reverses.
+The no-slip wall becomes a value closure, and the stress-free surface becomes a flux closure, as we discuss in Section~\ref{sec:concl}.
+We write the unified assembled row as:
 \begin{equation}
   \sum_j W_{ij}\,w_{ij}\,p_{ij}-\sigma_i S_i\,p_i=b_i,
   \label{eq:row}
 \end{equation}
-with $w_{ij}=1-\xij\cdot\Vi$ and a correction vector $\Vi$ that absorbs the Neumann and
-free-surface geometry, derived below. In difference form the sparse matrix and the right-hand
-side are assembled as
+using the weight $w_{ij}=1-\xij\cdot\Vi$.
+Here, the correction vector $\Vi$ absorbs the Neumann and free-surface geometry, which we derive below.
+In difference form, we assemble the sparse matrix and the right-hand side as:
 \begin{align}
   A_{ij} &= W_{ij}\,w_{ij}\quad(j\neq i), \label{eq:Aoff}\\
   A_{ii} &= -\sum_{j} W_{ij}\,w_{ij}-\sigma_i S_i, \label{eq:Adiag}\\
   b_i &= \frac{\nabla^2 p_i}{N_i}+b_{\mathrm{N},i}-\sigma_i S_i\,p_{\mathrm{target}}. \label{eq:rhs}
 \end{align}
-The source enters normalised by $N_i$. The Neumann flux $b_{\mathrm{N},i}$ is already
-normalised and is not divided by $N_i$. The free-surface term contributes $-\sigma_i S_i$ to
-the diagonal, Eq.~\eqref{eq:Adiag}, and $-\sigma_i S_i\,p_{\mathrm{target}}$ to the right-hand
-side, Eq.~\eqref{eq:rhs}.
+
+We normalise the source term by $N_i$ as it enters the equations.
+In contrast, the Neumann flux term $b_{\mathrm{N},i}$ is already normalised, and we do not divide it by $N_i$.
+The free-surface term contributes $-\sigma_i S_i$ to the diagonal in Eq.~\eqref{eq:Adiag} and $-\sigma_i S_i\,p_{\mathrm{target}}$ to the right-hand side in Eq.~\eqref{eq:rhs}.
 
 \subsection{Flux closure (Neumann) by tangential projection}
 \label{sec:wall}
 
-Two flux closures are presented for the Neumann boundary, of which this section presents the
-tangential projection scheme. It is linear-exact but imposes only the flux, and the resulting
-one-sided normal stencil limits its accuracy, which motivates the algebraic-ghost closure of
-Section~\ref{sec:ghost}.
+We present two flux closures for the Neumann boundary.
+In this section, we detail the tangential projection scheme.
+It is exact for linear fields but only imposes the flux value.
+As a consequence, the resulting stencil remains one-sided in the normal direction, which limits its accuracy.
+This limitation motivates the algebraic-ghost closure that we introduce in Section~\ref{sec:ghost}.
 
-Additional nodes are not generated on the Neumann boundary. 
-The modification activates on any node whose
-support is truncated by the boundary, within a distance of order $h$. Such a node interacts
-with $K$ nearby boundary segments, each with an outward unit normal $\mathbf n_k$, a foot
-point $\mathbf x_{f,k}$, and a prescribed flux $g_k$. A tangential projector $\Ptan$ removes
-the boundary-normal directions from the reconstruction, and the unresolved normal
-contribution is supplied by the known flux. Two projectors are introduced as follows.
+We do not generate additional nodes on the Neumann boundary.
+Instead, we activate the modification on any node whose support the boundary truncates, within a distance of order $h$.
+Such a node interacts with $K$ nearby boundary segments.
+Each segment has an outward unit normal $\mathbf n_k$, a foot point $\mathbf x_{f,k}$, and a prescribed flux $g_k$.
+A tangential projector $\Ptan$ removes the boundary-normal directions from the reconstruction.
+The known flux then supplies the unresolved normal contribution.
+We introduce two projectors for this purpose.
 
-The \emph{averaged-normal} projector (referred to as AN) builds a single effective normal
-from the boundary normals and projects it out,
+In the averaged-normal projector, referred to as AN, we build a single effective normal from the boundary normals and project it out:
 \begin{align}
   \mathbf n_{\mathrm{eff}} &= \frac{\sum_k\beta_k\,\mathbf n_k}{\big|\sum_k\beta_k\,\mathbf n_k\big|}, \label{eq:neff}\\
-  \Ptan &= \mathbf I-\mathbf n_{\mathrm{eff}}\otimes\mathbf n_{\mathrm{eff}}, \label{eq:AN}
+  \Ptan &= \mathbf I-\mathbf n_{\mathrm{eff}}\otimes\mathbf n_{\mathrm{eff}}. \label{eq:AN}
 \end{align}
-where the proximity weights decay with the distance to the boundary $\delta_{w,k}$,
+Here, the proximity weights decay with the distance to the boundary $\delta_{w,k}$:
 \begin{equation}
   \beta_k=\frac{\max\!\big(0,\,1-\delta_{w,k}/h_w\big)^2}{\sum_m\max\!\big(0,\,1-\delta_{w,m}/h_w\big)^2}.
   \label{eq:beta}
 \end{equation}
-The AN projector is exact for a flat boundary and for smooth curved boundaries, but it
-introduces an $O(\Delta)$ error at a non-orthogonal corner, where a single averaged normal
-cannot span the full normal subspace. The \emph{general Gram projector} (referred to as GGP)
-instead removes the entire subspace spanned by the boundary normals. Collecting them as the
-columns of $\mathbf N=[\mathbf n_1\,|\cdots|\,\mathbf n_K]$, the Gram matrix and the projector
-are
+The AN projector is exact for flat and smoothly curved boundaries.
+However, non-orthogonal corners introduce an error of $O(\Delta)$.
+In those regions, a single averaged normal cannot span the full normal subspace.
+The general Gram projector, referred to as GGP, solves this by removing the entire subspace that the boundary normals span.
+We collect these normals as the columns of a matrix $\mathbf N=[\mathbf n_1\,|\cdots|\,\mathbf n_K]$.
+We then define the Gram matrix and the projector as:
 \begin{align}
   \mathbf G &= \mathbf N^\top\mathbf N, \label{eq:gram}\\
   \Ptan &= \mathbf I-\mathbf N\mathbf G^{-1}\mathbf N^\top. \label{eq:GGP}
 \end{align}
-The projector is symmetric, idempotent and annihilates every boundary normal,
-$\Ptan\mathbf n_k=\mathbf 0$, and is therefore exact for arbitrary corner geometry.
-Near-parallel boundaries are regularised by $\mathbf G\to\mathbf G+\epsilon\mathbf I$ with
-$\epsilon\sim10^{-2}$. For $K=1$ and for orthogonal normals the two projectors coincide, and
-for $K=d$ non-coplanar boundaries $\Ptan=\mathbf 0$, so the node is fully enclosed and
-determined by the boundary data.
+The projector is symmetric and idempotent.
+It annihilates every boundary normal, so that $\Ptan\mathbf n_k=\mathbf 0$.
+Thus, it is exact for arbitrary corner geometries.
+We perform regularisation near near-parallel boundaries by setting $\mathbf G\to\mathbf G+\epsilon\mathbf I$ with $\epsilon\sim10^{-2}$.
+For a single segment ($K=1$) and for orthogonal/near-orthogonal normals, the two projectors coincide.
+For $K=d$ non-coplanar boundaries, the projector becomes $\Ptan=\mathbf 0$.
+In this case, the boundary data entirely determines the fully enclosed node.
 
-A consequence of the renormalisation is that the projection must be performed in physical
-space, on the raw offset $\oi$, before renormalisation by $\Bi$. The projected offset is
-formed first and only then renormalised into the correction vector,
+A key detail of the renormalisation is that we must perform the projection in physical space, on the raw offset $\oi$, before renormalising by $\Bi$.
+We project the offset first and only then renormalise it into the correction vector:
 \begin{align}
   \ow &= \Ptan\,\oi, \label{eq:ow}\\
   \Vi &= \Bi\,\ow. \label{eq:projorder}
 \end{align}
-The alternative ordering $\Ptan(\Bi\oi)$ removes a component along $\mathbf n$ rather than the
-correct $\Bi\mathbf n$ direction, and the two coincide only if $\mathbf n$ is an eigenvector of
-$\Bi$, which does not occur for realistic clouds. Only the project-then-renormalise ordering of
-Eq.~\eqref{eq:projorder} preserves linear consistency at the boundary, as is shown next.
+If we used the alternative ordering $\Ptan(\Bi\oi)$, it would remove a component along $\mathbf n$ instead of the correct $\Bi\mathbf n$ direction.
+These two directions coincide only if $\mathbf n$ is an eigenvector of $\Bi$, which does not happen for real point clouds.
+Only the project-then-renormalise ordering in Eq.~\eqref{eq:projorder} preserves linear consistency at the boundary, as we show next.
 
-With $\Vi=\Bi\ow$ the correction weight becomes $w_{ij}=1-\xij\cdot\Vi$. For a linear field
-$f=\mathbf a\cdot\mathbf x+b$, with $f_{ij}=\mathbf a\cdot\xij$, the left-hand side of the
-assembled row evaluates, using $\Mi\Bi=\mathbf I$, to
+Using $\Vi=\Bi\ow$, the correction weight becomes $w_{ij}=1-\xij\cdot\Vi$.
+If we consider a linear field $f=\mathbf a\cdot\mathbf x+b$, where $f_{ij}=\mathbf a\cdot\xij$, the left-hand side of the assembled row evaluates to:
 \begin{equation}
   \sum_j W_{ij}\,f_{ij}\,w_{ij}
   =\mathbf a\cdot\oi-\mathbf a\cdot\Mi\Vi
@@ -541,268 +494,254 @@ assembled row evaluates, using $\Mi\Bi=\mathbf I$, to
   =\mathbf a\cdot(\mathbf I-\Ptan)\,\oi,
   \label{eq:wallresid}
 \end{equation}
-a residual that is exactly the part of $\oi$ in the boundary-normal subspace. The closure
-cancels it with the prescribed flux placed on the right-hand side,
+where we use the identity $\Mi\Bi=\mathbf I$.
+This residual represents the part of $\oi$ that lies in the boundary-normal subspace.
+The closure cancels this term by placing the prescribed flux on the right-hand side:
 \begin{equation}
   b_{\mathrm{N},i}=
   \begin{cases}
-    g_{\mathrm{eff}}\,(\oi\cdot\mathbf n_{\mathrm{eff}}), & \text{AN},\;g_{\mathrm{eff}}=\textstyle\sum_k\beta_k g_k,\\[2pt]
+    g_{\mathrm{eff}}\,(\oi\cdot\mathbf n_{\mathrm{eff}}), & \text{AN},\;g_{\mathrm{eff}}=\textstyle\sum_k\beta_k g_k,\\\\[2pt]
     (\mathbf N^\top\oi)^\top\mathbf G^{-1}\mathbf g, & \text{GGP}.
   \end{cases}
   \label{eq:bwall}
 \end{equation}
-That this is the correct cancellation is verified by writing the Gram projector complement as
-$\mathbf I-\Ptan=\mathbf N\mathbf G^{-1}\mathbf N^\top$ and noting that, for a linear field,
-the vector of nodal fluxes is $\mathbf g=[\,\mathbf n_k\cdot\mathbf a\,]_k=\mathbf N^\top\mathbf a$.
-The residual of Eq.~\eqref{eq:wallresid} is then
+We verify this cancellation by writing the Gram projector complement as $\mathbf I-\Ptan=\mathbf N\mathbf G^{-1}\mathbf N^\top$.
+For a linear field, the vector of nodal fluxes is $\mathbf g=[\,\mathbf n_k\cdot\mathbf a\,]_k=\mathbf N^\top\mathbf a$.
+The residual in Eq.~\eqref{eq:wallresid} then becomes:
 \begin{equation}
   \mathbf a\cdot(\mathbf I-\Ptan)\oi
   =\mathbf a^\top\mathbf N\mathbf G^{-1}\mathbf N^\top\oi
   =(\mathbf N^\top\oi)^\top\mathbf G^{-1}\mathbf g
-  =b_{\mathrm{N},i},
-  \label{eq:bwallderiv}
+  =b_{\mathrm{N},i}.
 \end{equation}
-so $\sum_j W_{ij}f_{ij}w_{ij}=b_{\mathrm{N},i}=\nabla^2 f/N_i+b_{\mathrm{N},i}$ holds, with
-$\nabla^2 f=0$, on any truncated support, including a non-orthogonal corner. The reversed
-ordering $\Ptan(\Bi\oi)$ would replace $\Mi\Vi=\ow$ in Eq.~\eqref{eq:wallresid} by
-$\Mi\Ptan\Bi\oi\neq\ow$, breaking the cancellation. This closure will be referred to as the
-\emph{projection closure}.
+Thus, the equation $\sum_j W_{ij}f_{ij}w_{ij}=b_{\mathrm{N},i}$ holds for any linear field on any truncated support, including non-orthogonal corners.
+If we had used the reversed ordering $\Ptan(\Bi\oi)$, the term $\Mi\Ptan\Bi\oi\neq\ow$ would replace $\Mi\Vi=\ow$ in Eq.~\eqref{eq:wallresid}, breaking this exact cancellation.
+We refer to this method as the projection closure.
 
-The projection closure is correct and linear-exact, but it imposes only the first-derivative
-flux at the boundary. For nonlinear solutions the normal second derivative
-$\partial^2 p/\partial n^2$ is left to one-sided support and is poorly resolved. As the results
-of Section~\ref{sec:bvp} show, this makes the Neumann boundary the accuracy-limiter. By the
-boundary-layer mechanism of LeVeque~\cite[\S2.12]{LeVeque2007}, an $O(h)$ boundary-row
-truncation error sits at a node whose column of the inverse operator is $O(1)$, and is
-therefore undamped and pollutes the solution with a large constant. The remedy is to complete
-the boundary stencil, which is the subject of the next section.
+The projection closure is correct and exact for linear fields.
+However, the closure only imposes the first-derivative flux at the boundary.
+For nonlinear solutions, the normal second derivative $\partial^2 p/\partial n^2$ retains a one-sided support.
+This leads to poor resolution.
+As we show in Section~\ref{sec:bvp}, the Neumann boundary becomes the accuracy-limiter.
+According to the boundary-layer mechanism of LeVeque~\cite[\S2.12]{LeVeque2007}, an $O(h)$ boundary-row truncation error sits at a node whose column of the inverse operator is $O(1)$.
+The operator therefore does not damp this error, which pollutes the global solution with a large constant offset.
+To remedy this, we complete the stencil in the next section.
 
 \subsection{Flux closure (Neumann) by algebraic ghosting}
 \label{sec:ghost}
 
-The limitation of the projection closure is removed by stencil completion. Rather than
-projecting out the unresolved normal direction, it is filled with image samples, such that
-$\partial^2 p/\partial n^2$ becomes a genuine two-sided difference, with the prescribed flux
-setting the image values. This is the classical ghost-node, or image-particle,
-construction~\cite{Gibou2002,LeVeque2007}, and the contribution here is its packaging for the
-renormalised operator without additional unknowns. For a Neumann node $i$ with nearby boundary segments
-$\{(\mathbf n_k,\mathbf x_{f,k},g_k)\}$, let $R_k$ denote reflection across the plane through
-$\mathbf x_{f,k}$ with normal $\mathbf n_k$, and let the reflection group be the set of
-non-empty compositions of the $R_k$. For $K=1$ the group is $\{R_1\}$, and for an orthogonal
-corner with $K=2$ it is $\{R_1,R_2,R_2\!\circ\!R_1\}$, the last composition being the corner
-double reflection that fills the far quadrant. For a non-orthogonal wedge the group generated
-by the two planes is in general infinite, and it is truncated to the single reflections and
-the first-order double reflection $R_2\!\circ\!R_1$. This truncation does not reproduce the
-exact image set of the wedge, but it is empirically sufficient to restore the symmetry of the
-moment tensor $\Mi$ and to recover the convergence reported in Section~\ref{sec:b6}. Every
-neighbour $j$ and the node $i$ itself are reflected. A source point $\mathbf x_s$ maps under a composition to
-$\mathbf x_s\mapsto\mathbf x_s-2\sigma_k\mathbf n_k$ with
-$\sigma_k=(\mathbf x_s-\mathbf x_{f,k})\cdot\mathbf n_k$, and the image carries the
-Neumann-consistent value $p_{\mathrm{ghost}}=p_s+\sum_{k}(-2\sigma_k g_k)$. Each image within
-$h$ is appended to the support with its kernel weight and is included in $\Mi$, $\oi$ and
-$N_i$, which restores near-symmetric support. The completed row may be normalised by either
-form of Section~\ref{sec:operators}. The sum normalisation, Eq.~\eqref{eq:Nden}, is found
-to restore close to second-order convergence at a straight Neumann boundary and is preferred,
-while the smooth-naive form is retained at non-orthogonal corners, as Section~\ref{sec:neustraight}
-shows. The Laplacian row then couples the image back to its source node $p_s$, either a
-neighbour or $i$, with the standard weight, and the constant flux increment moves to the
-right-hand side. Two details are each verified to be necessary.
-The self-reflection of $i$ supplies the closest and highest-weight image, its diagonal
-contribution cancelling while its flux increment survives on the right-hand side. The corner
-double reflection supplies the otherwise missing quadrant. This closure will be referred to as
-the \emph{algebraic-ghost closure}. It preserves linear-exactness. For a linear field
-$f=\mathbf a\cdot\mathbf x+b$ the flux is $g=\mathbf a\cdot\mathbf n$, and the assigned image
-value reproduces the true field at the mirrored point,
+Stencil completion removes the limitation of the projection closure.
+Instead of projecting out the unresolved normal direction, we fill the support with image samples.
+This turns the normal second derivative $\partial^2 p/\partial n^2$ into a genuine two-sided difference, with the prescribed flux setting the values of the image points.
+This is the basic ghost-node, or image-particle, construction~\cite{Gibou2002,LeVeque2007}.
+In this work, we package this construction for the renormalised operator without adding new unknowns.
+Consider a Neumann node $i$ with nearby boundary segments $\{(\mathbf n_k,\mathbf x_{f,k},g_k)\}$.
+Let $R_k$ denote reflection across the plane passing through $\mathbf x_{f,k}$ with normal $\mathbf n_k$.
+We define the reflection group as the set of all non-empty compositions of these reflections $R_k$.
+For a single segment ($K=1$), the group is simply $\{R_1\}$.
+For an orthogonal corner ($K=2$), the group is $\{R_1,R_2,R_2\!\circ\!R_1\}$, where the last composition represents the double reflection that fills the far quadrant.
+For a non-orthogonal wedge, the two planes generate an infinite group.
+In this case, we truncate the group to the single reflections and the first-order double reflection $R_2\!\circ\!R_1$.
+Although this truncation does not reproduce the exact image set of the wedge, it is empirically sufficient.
+This restores the symmetry of the moment tensor $\Mi$ and recovers the convergence rates reported in Section~\ref{sec:b6}.
+We reflect every neighbour $j$ as well as the node itself.
+Under a composition, a source point $\mathbf x_s$ maps to $\mathbf x_s\mapsto\mathbf x_s-2\sigma_k\mathbf n_k$, where we define $\sigma_k$ as $(\mathbf x_s-\mathbf x_{f,k})\cdot\mathbf n_k$.
+We assign a Neumann-consistent value to the corresponding image point: $p_{\mathrm{ghost}}=p_s+\sum_{k}(-2\sigma_k g_k)$.
+We append every image point within the support radius $h$ to the stencil with its kernel weight.
+These points enter the calculations of $\Mi$, $\oi$, and $N_i$.
+This process restores a near-symmetric support.
+We can normalise the completed row using either of the forms from Section~\ref{sec:operators}.
+We prefer the sum normalisation in Eq.~\eqref{eq:Nden} because it restores close to second-order convergence at straight Neumann boundaries.
+At non-orthogonal corners, we retain the smooth-naive form, as shown in Section~\ref{sec:neustraight}.
+The Laplacian row couples the image point back to its source node $p_s$ (which is either a neighbour or node $i$ itself) using the standard weight, and we move the constant flux increment to the right-hand side.
+We verified that two specific details are necessary.
+First, the self-reflection of node $i$ provides the closest and highest-weight image point.
+The diagonal contribution cancels out, while the flux increment remains on the right-hand side.
+Second, the double reflection at corners fills the otherwise empty quadrant.
+We refer to this scheme as the algebraic-ghost closure.
+The scheme preserves linear exactness.
+For a linear field $f=\mathbf a\cdot\mathbf x+b$, the flux is $g=\mathbf a\cdot\mathbf n$.
+The assigned image value reproduces the true field at the mirrored point:
 \begin{equation}
   p_{\mathrm{ghost}}=f(\mathbf x_s)-2\sigma\,(\mathbf a\cdot\mathbf n)
   =\mathbf a\cdot(\mathbf x_s-2\sigma\mathbf n)+b
   =f(\mathbf x_s-2\sigma\mathbf n)=f(\mathbf x_{\mathrm{ghost}}),
   \label{eq:ghostexact}
 \end{equation}
-and the completed support is an ordinary, linear-exact renormalised stencil. Unlike the
-projection closure, the two-sided support supplies the normal curvature, and the boundary
-ceases to be the bottleneck. The reflection plane is exact for straight boundary segments. A
-curved boundary is treated by a finely faceted polygon, with a local-plane generalisation left
-as future work. The closure is applied only to Neumann nodes. The free surface, the contact
-lines, and the interior retain the single code path of Sections~\ref{sec:wall}
-and~\ref{sec:surface}.
+Thus, the completed support acts as an ordinary, linear-exact renormalised stencil.
+Unlike the projection closure, the two-sided support resolves the normal curvature.
+The boundary is no longer the bottleneck.
+This reflection plane approximation is exact for straight boundary segments.
+For curved boundaries, we use a finely faceted polygon, leaving a local curved-plane generalisation for future work.
+We apply this closure only to Neumann nodes.
+The free surface, the contact lines, and the interior retain the single code path of Sections~\ref{sec:wall} and~\ref{sec:surface}.
 
-The ghosts are algebraic and ephemeral. They are formed on the fly within the local neighbour
-sum of a single row, contribute to that row's moment tensor and coefficients, and are then
-discarded. No ghost particles are stored, no memory is allocated beyond the row-local arrays,
-and the global neighbour list is neither extended nor re-searched. This is in contrast to
-dummy-particle treatments, which allocate and maintain layers of boundary particles and
-enlarge the neighbour search.
+These ghost nodes are algebraic and ephemeral.
+We form them on the fly within the local neighbour sum of a single row.
+They contribute to that row's moment tensor and coefficients before we discard them.
+We do not store ghost particles, allocate global memory beyond row-local arrays, or extend and re-search the global neighbour list.
+This provides a key advantage over dummy-particle treatments, in which layers of physical boundary particles are allocated and maintained, significantly increasing the cost of neighbour searches.
 
 \subsection{Value closure (Dirichlet/Robin) and free-surface detection}
 \label{sec:surface}
 
-The value closure integrates a Dirichlet or Robin datum into the diagonal of the row, by the
-principle of Section~\ref{sec:bytype}. Its showcase is the free surface, a value boundary that
-is moreover detected from the cloud rather than prescribed. At the free surface the field
-satisfies $p=p_{\mathrm{target}}$, which is zero for a clean surface and $\gamma\kappa$ with
-surface tension. No surface particles are placed, and every node with air-side truncation
-receives the condition. A Taylor expansion to the surface at a
-distance $\delta$ along the outward normal $\ns$ converts the Dirichlet datum into a Robin
-form whose flux depends on the unknown nodal value,
+Following the main principle of this work, the value closure integrates the Dirichlet or Robin condition directly into the diagonal.
+The primary application is the free surface.
+We detect this value boundary directly from the cloud rather than prescribing it beforehand.
+At the free surface, the field satisfies $p=p_{\mathrm{target}}$.
+This target value is zero for a clean surface and $\gamma\kappa$ when surface tension is present.
+We do not place surface particles.
+Instead, every node with an air-side truncation receives this boundary condition.
+We convert the Dirichlet condition into a Robin form by a Taylor expansion to the surface at a distance $\delta$ along the outward normal $\ns$:
 \begin{equation}
-  \nabla p_i\cdot\ns=\frac{p_{\mathrm{target}}-p_i}{\delta},
+  \nabla p_i\cdot\ns=\frac{p_{\mathrm{target}}-p_i}{\delta}.
   \label{eq:dir2robin}
 \end{equation}
-which produces the diagonal modification of Eq.~\eqref{eq:row} rather than a pure
-right-hand-side term. The surface geometry is obtained from the cloud as the support
-deficiency that the Neumann boundary cannot explain, that is, from the projected offset $\ow$,
-such that a corner does not contaminate the surface normal. The residual, the outward normal
-and the surface distance are
+This formulation produces the diagonal modification in Eq.~\eqref{eq:row} instead of a pure right-hand-side source.
+We obtain the surface geometry from the point cloud by identifying the support deficiency that the Neumann boundary cannot explain.
+Specifically, we compute it from the projected offset $\ow$.
+This ensures that corner geometries do not contaminate the surface normal.
+We calculate the residual vector, the outward normal, and the surface distance as:
 \begin{align}
   \ri &= \Bi\,\ow, \label{eq:ri}\\
   \ns &= -\ri/|\ri|, \label{eq:ns}\\
   \delta &= |\ow\cdot\ns|/S_i. \label{eq:delta}
 \end{align}
-With these natural estimates the Robin enforcement strength $-(\ow\cdot\ns)/\delta$ cancels to
-a geometric quantity. Writing $\ns=-\ri/|\ri|$ and $\ri=\Bi\ow$, the numerator is
+With these natural estimates, the Robin enforcement strength $-(\ow\cdot\ns)/\delta$ simplifies to a purely geometric quantity.
+If we write $\ns=-\ri/|\ri|$ and $\ri=\Bi\ow$, the numerator is:
 \begin{equation}
-  \ow\cdot\ns=-\frac{\ow\cdot\ri}{|\ri|}=-\frac{\ow\cdot\Bi\ow}{|\ri|}<0,
+  \ow\cdot\ns=-\frac{\ow\cdot\ri}{|\ri|}=-\frac{\ow\cdot\Bi\ow}{|\ri|}<0.
   \label{eq:odn}
 \end{equation}
-the sign being fixed by the positive-definiteness of $\Bi$, since the offset points inward and
-the normal outward. The distance estimate is then
-$\delta=|\ow\cdot\ns|/S_i=(\ow\cdot\Bi\ow)/(|\ri|\,S_i)$, and the common factor
-$(\ow\cdot\Bi\ow)/|\ri|$ cancels between numerator and denominator,
+The positive-definiteness of $\Bi$ guarantees a negative sign.
+This reflects the fact that the offset points inward while the normal points outward.
+The distance estimate is $\delta=|\ow\cdot\ns|/S_i=(\ow\cdot\Bi\ow)/(|\ri|\,S_i)$.
+Upon division, the common factor $(\ow\cdot\Bi\ow)/|\ri|$ cancels out completely between the numerator and denominator:
 \begin{equation}
   -\frac{\ow\cdot\ns}{\delta}
   =\frac{(\ow\cdot\Bi\ow)/|\ri|}{(\ow\cdot\Bi\ow)/(|\ri|\,S_i)}
-  =S_i,
+  =S_i.
   \label{eq:cancel}
 \end{equation}
-The enforcement strength is therefore the total kernel weight, which is never singular, is
-self-scaling, and is free of any penalty parameter. The free surface is detected, again
-without a threshold, from the dimensionless indicator
+Thus, the enforcement strength is exactly the total kernel weight $S_i$.
+This quantity is never singular, scales automatically, and is free of any penalty parameters.
+We detect the free surface without using a threshold by defining a dimensionless indicator:
 \begin{equation}
-  \lambda_i=|\ri|\,\Delta,
+  \lambda_i=|\ri|\,\Delta.
   \label{eq:lambda}
 \end{equation}
-which is $\approx0$ in the interior and $O(1)$ at the surface, through a smooth activation
-$\sigma_i=\sigma(\lambda_i)\in[0,1]$. The cubic smoothstep is recommended,
+This indicator is close to zero in the interior of the domain.
+At the surface, it becomes $O(1)$.
+We map it to the range $[0, 1]$ using a smooth activation function $\sigma_i=\sigma(\lambda_i)$.
+We recommend a cubic smoothstep function:
 \begin{equation}
-  \sigma_i=S\!\big(3(\lambda_i-\tfrac23)\big),\qquad
-  S(t)=\begin{cases}0,&t\le0,\\ 3t^2-2t^3,&0<t<1,\\ 1,&t\ge1,\end{cases}
+  \sigma_i=S\!\big(3(\lambda_i-\tfrac23)\big),
   \label{eq:smoothstep}
 \end{equation}
-which is zero for $\lambda_i\le\tfrac23$, leaving the interior nodes untouched, is unity for
-$\lambda_i\ge1$, and introduces no parameter. The normal component is then removed in a
-regularised manner that avoids normalising $\ri$, and the result is renormalised into the
-correction vector and weight,
+where we define the smooth step function as $S(t)=\begin{cases}0,&t\le0,\\ 3t^2-2t^3,&0<t<1,\\ 1,&t\ge1,\end{cases}$, which remains zero for $\lambda_i\le\tfrac23$ to leave interior nodes untouched.
+It reaches unity for $\lambda_i\ge1$, and introduces no free parameters.
+We then remove the normal component in a regularised manner that avoids dividing by zero, and renormalise the result into the correction vector and weight:
 \begin{align}
   \mathbf o_{*,i} &= \ow-\sigma_i\,\frac{(\ow\cdot\ri)\,\ri}{|\ri|^2+\eta^2}, \label{eq:ostar}\\
   \Vi &= \Bi\,\mathbf o_{*,i}, \label{eq:Vsurf}\\
   w_{ij} &= 1-\xij\cdot\Vi. \label{eq:wsurf}
 \end{align}
-The diagonal then receives $-\sigma_i S_i$ with the right-hand side receiving
-$-\sigma_i S_i\,p_{\mathrm{target}}$, where $p_{\mathrm{target}}$ is evaluated at the
-detected surface point $\mathbf x_i+\delta\ns$. The free-surface datum is thereby integrated as
-the value-dependent Robin flux of Eq.~\eqref{eq:dir2robin}, its known part entering the
-right-hand side and its value-dependent part the diagonal of the same collocation row, just as
-the Neumann flux enters the right-hand side. Every boundary condition is in this way recast as a
-generalised flux and folded into the operator, which is the sense denoted interchangeably by the
-terms ``boundary-integrated'' and ``flux-integrated'' that name the method.
+The diagonal of the row receives a contribution of $-\sigma_i S_i$, while the right-hand side receives the term $-\sigma_i S_i\,p_{\mathrm{target}}$.
+Here, we evaluate $p_{\mathrm{target}}$ at the detected surface point $\mathbf x_i+\delta\ns$.
+In this way, we integrate the free-surface condition as a value-dependent Robin flux.
+Its known part enters the right-hand side, and its value-dependent part goes to the diagonal of the same collocation row.
+This is exactly the treatment used for the Neumann flux.
+We thus recast every boundary condition as a generalised flux and fold it directly into the operator.
+Because of this unified treatment, we name the method boundary-integrated or flux-integrated.
 
 \subsection{Contact lines and the unified equation}
 \label{sec:unified}
 
-At a contact line a node is both a Neumann node and a surface node. Because the surface
-residual is computed from the projected offset $\ow$, it lies in the boundary-tangential
-subspace and the two projections do not interfere. The Neumann projection of
-Section~\ref{sec:wall} and the surface removal of Section~\ref{sec:surface} compose into a
-single $\mathbf o_{*,i}$ and a single $\Vi$, and Eq.~\eqref{eq:row} is assembled with the
-Neumann flux on the right-hand side and the surface term on the diagonal. Interior nodes, with
-$\sigma_i=0$ and no boundary, reduce to Eq.~\eqref{eq:lap}. Neumann-only nodes reduce to
-Section~\ref{sec:wall}, and surface-only nodes reduce to Section~\ref{sec:surface}. The
-single-code-path property is thereby retained for all node classes. A pure-Neumann domain is
-singular up to an additive constant and must be closed by a zero-mean constraint rather than a
-single-point pin. Any free-surface node, with $\sigma_i>0$, removes the null space
-automatically.
+A node at a contact line acts as both a Neumann node and a surface node.
+Because we compute the surface residual from the projected offset $\ow$, it lies in the boundary-tangential subspace.
+As a result, the two projections do not interfere with one another.
+This achieves a clean composition between the Neumann projection of Section~\ref{sec:wall} and the surface removal of Section~\ref{sec:surface}.
+We produce a single vector $\mathbf o_{*,i}$ and a single correction vector $\Vi$.
+We then assemble Eq.~\eqref{eq:row} with the Neumann flux on the right-hand side and the surface value term on the diagonal.
+Interior nodes have $\sigma_i=0$ and no boundary interactions, so they simplify to Eq.~\eqref{eq:lap}.
+Neumann-only nodes reduce to the equations in Section~\ref{sec:wall}, and surface-only nodes reduce to those in Section~\ref{sec:surface}.
+All classes of nodes thus retain the single-code-path property.
+Note that a pure-Neumann domain is singular up to an archetype scalar constant.
+We must close such systems with a zero-mean constraint instead of pinning a single point.
+However, any free-surface node with $\sigma_i>0$ automatically removes this null space.
 
 \subsection{A remark on consistency and convergence}
 \label{sec:remark}
 
-The closures inherit the linear consistency of the interior operator. For
-$f=\mathbf a\cdot\mathbf x+b$, the gradient~\eqref{eq:grad}, the Laplacian~\eqref{eq:lap}, the
-projection closure~\eqref{eq:bwall} and the algebraic-ghost closure each reproduce the exact
-result on any cloud, including truncated and corner rows, which is verified to round-off in
-Section~\ref{sec:opresults}. The free-surface cancellation~\eqref{eq:cancel} is an algebraic
-identity. As anticipated in Section~\ref{sec:operators}, linear consistency does not imply
-second-order pointwise consistency under fixed-relative disorder, and the realised order is
-governed by the boundary closure. The value closure supraconverges, whereas the flux-only
-Neumann closure, which leaves the normal second derivative one-sided, is the accuracy-limiter
-by the undamped-boundary-column mechanism of LeVeque~\cite[\S2.12]{LeVeque2007}. The
-algebraic-ghost closure, by supplying that curvature, removes the bottleneck. These statements
-are quantified in the following sections. The rigorous consistency and convergence theory of
-the underlying operators is given in~\cite{Basic2018,Lanson2008a}.
+The closures inherit the linear consistency of the interior operator.
+For a linear field $f=\mathbf a\cdot\mathbf x+b$, the gradient in Eq.~\eqref{eq:grad}, the Laplacian in Eq.~\eqref{eq:lap}, the projection closure in Eq.~\eqref{eq:bwall}, and the algebraic-ghost closure all reproduce the exact solution.
+This holds for truncated supports and corner rows alike, as we verify to round-off error in Section~\ref{sec:opresults}.
+Furthermore, the free-surface cancellation in Eq.~\eqref{eq:cancel} is an exact algebraic identity.
+However, as noted in Section~\ref{sec:operators}, linear consistency does not guarantee second-order pointwise consistency under fixed-relative disorder.
+In practice, the boundary closure governs the actual convergence rate.
+The value closure supraconverges.
+On the other hand, the flux-only Neumann closure leaves the normal second derivative one-sided.
+The boundary thus becomes the primary accuracy bottleneck due to the undamped boundary column mechanism described by LeVeque~\cite[\S2.12]{LeVeque2007}.
+The algebraic-ghost closure resolves this by supplying the missing normal curvature.
+We quantify these observations in the following sections.
+For the formal consistency and convergence proofs of the underlying operators, we refer readers to~\cite{Basic2018,Lanson2008a}.
 
-% =============================================================================
 \section{Operator approximation results}
 \label{sec:opresults}
 
-The discrete operators were verified against analytic ground truths on regular and scattered
-clouds. Throughout, the disorder is measured by the chaos level $c$ of~\cite{Basic2018}. A
-node is displaced by a random vector with components in $[-c\Delta/2,\,c\Delta/2]$, and
-scattered results are reported as the median over at least twenty random realisations. The
-error measure is the normalised root-mean-square error
-$\mathrm{Error}=\|\langle f\rangle-f\|_2/\|f\|_2$ of~\cite{Basic2018}.
+We verified the discrete operators against analytic ground truths on both regular and scattered point clouds.
+To measure particle disorder, we use the chaos level $c$ defined in~\cite{Basic2018}.
+We displace each node by a random vector with components in the interval $[-c\Delta/2,\,c\Delta/2]$.
+We report scattered results as the median over at least twenty random realisations.
+We choose the normalised root-mean-square error, $\mathrm{Error}=\|\langle f\rangle-f\|_2/\|f\|_2$, as our error metric, following~\cite{Basic2018}.
 
-The renormalised gradient~\eqref{eq:grad} and Laplacian~\eqref{eq:lap} are linear-exact on
-every cloud tested, including truncated boundary rows and the non-orthogonal wedge, to
-$\sim10^{-15}$ and $\sim10^{-13}$ respectively. The Gram-projector algebra is exact to
-$\sim10^{-16}$. The projector $\Ptan$ is idempotent and symmetric, $\Ptan\mathbf n_k=\mathbf 0$
-for every boundary normal, AN and GGP coincide for $K=1$ and for orthogonal normals, and three
-non-coplanar boundaries give $\Ptan=\mathbf 0$. The Neumann linear consistency
-$\sum_j W_{ij}w_{ij}f_{ij}=b_{\mathrm{N},i}$ holds to $\sim10^{-17}$, and the
-project-then-renormalise ordering of Eq.~\eqref{eq:projorder} is required, since reversing it
-breaks consistency at $O(10^{-3})$ on a jittered cloud. The free-surface
-cancellation~\eqref{eq:cancel} holds to round-off, and a hydrostatic, linear Poisson problem
-on the wedge tank is recovered to $\sim10^{-14}$ with GGP boundaries. The algebraic-ghost
-closure preserves linear-exactness to $\sim10^{-15}$.
+The renormalised gradient $\gradop{f}_i$ in Eq.~\eqref{eq:grad} and the Laplacian in Eq.~\eqref{eq:lap} are exact for linear fields on all tested clouds.
+This accuracy extends to truncated boundary rows and the non-orthogonal wedge, matching analytical values to within $\sim10^{-15}$ and $\sim10^{-13}$ respectively.
+The Gram-projector algebra itself is exact to within $\sim10^{-16}$.
+The projector $\Ptan$ is symmetric and idempotent, satisfying $\Ptan\mathbf n_k=\mathbf 0$ for every boundary normal.
+We find that AN and GGP coincide when $K=1$ or when the normals are orthogonal.
+With three non-coplanar boundaries, the projector becomes $\Ptan=\mathbf 0$.
+The Neumann linear consistency condition, $\sum_j W_{ij}w_{ij}f_{ij}=b_{\mathrm{N},i}$, holds to within $\sim10^{-17}$.
+Our tests confirm that the project-then-renormalise ordering in Eq.~\eqref{eq:projorder} is essential.
+Reversing this order breaks consistency, introducing errors of $O(10^{-3})$ on a jittered cloud.
+The free-surface cancellation in Eq.~\eqref{eq:cancel} holds up to machine precision.
+As a result, we recover the hydrostatic linear Poisson problem on a wedge tank to within $\sim10^{-14}$ using GGP boundaries.
+Finally, the algebraic-ghost closure preserves linear exactness to within $\sim10^{-15}$.
 
-The $2/d$ factor of the smooth-naive normalisation, Eq.~\eqref{eq:N}, is pinned by a
-three-dimensional constant-Laplacian test, for which the bare $\mathrm{tr}\,\Bi$ form, without
-the $2/d$, is in error by a factor of $1.5$. The sum operator, with the denominator
-normalisation $N_i^{\mathrm{den}}$ of Eq.~\eqref{eq:Nden}, being exact for the isotropic
-quadratic, is between $8$ and $15\%$ more accurate at practical resolutions, with its edge
-widening under anisotropy. The sum-to-smooth-naive error ratio falls monotonically from $1.00$
-on a lattice to $0.73$ at chaos $80\%$, as shown in Fig.~\ref{fig:jitter}. It is offered as a
-refinement, and the smooth-naive operator remains the default for its lower cost.
+We confirmed the $2/d$ factor of the smooth-naive normalisation in Eq.~\eqref{eq:N} using a three-dimensional constant-Laplacian test.
+Without this factor, the bare $\mathrm{tr}\,\Bi$ normalisation is off by a factor of $1.5$.
+The sum operator uses the denominator normalisation $N_i^{\mathrm{den}}$ from Eq.~\eqref{eq:Nden}.
+Because it is exact for isotropic quadratics, it is about $8$ to $15\%$ more accurate at typical resolutions.
+The advantage becomes more pronounced under anisotropy.
+As shown in Fig.~\ref{fig:jitter}, the sum-to-smooth-naive error ratio decreases monotonically from $1.00$ on a regular grid to $0.73$ at $80\%$ chaos.
+We offer this as a refinement.
+We retain the smooth-naive operator as the default choice because of its lower computational cost.
 
-The pointwise approximation of the operator was examined on the Franke function of
-Franke~\cite{Franke1980} over the unit square, in the manner of~\cite{Basic2018}.
-Figure~\ref{fig:franke} reports the normalised error of the renormalised Laplacian against
-$\Delta$, on a regular lattice and at chaos $30$, $60$ and $90\%$, with two second-order
-references, the GFDM operator and the same-family Full-Inverse operator of Asai et
-al.~\cite{Asai2023}. On a regular lattice all operators are second-order. Under disorder
-the renormalised operator is linear-consistent, and its pointwise order falls with the chaos
-level, from $2.0$ on the lattice to about $0.7$, $0.2$ and $0.1$ at chaos $30$, $60$ and
-$90\%$, approaching the $O(1)$ truncation error noted in Section~\ref{sec:operators}. The GFDM
-operator remains close to second-order throughout, and the Full-Inverse operator, which
-augments the present renormalised stencil with the cross-derivative coupling, tracks it to
-within plotting accuracy. The two coincide because the lost order is due to the dropped cross
-terms and not to the renormalised family itself, so recovering it is a matter of reinstating
-those terms, at the cost of a small local solve per node, rather than of leaving the family.
-The order of the renormalised operator is
-recovered by enlarging the support radius. At chaos $60\%$ the order rises to about $1.0$ when
-the support is grown from $2.5\Delta$ to $3.5\Delta$, and to about $1.8$ at $5\Delta$, at the
-cost of a wider stencil. The support is nevertheless kept small, because the boundary value
-problem solution supraconverges at the smaller support, as Section~\ref{sec:bvp} shows.
+The pointwise approximation of the operator was evaluated using the Franke test function~\cite{Franke1980} on a unit square.
+This follows the methodology of~\cite{Basic2018}.
+In Fig.~\ref{fig:franke}, we plot the normalised error of the renormalised Laplacian against the spacing $\Delta$.
+We compare a regular lattice with disordered clouds at $30$, $60$, and $90\%$ chaos.
+We also include two second-order baselines: the GFDM operator and the Full Inverse operator of Asai et al.~\cite{Asai2023}.
+On a regular grid, all these operators achieve second-order accuracy.
+Under particle disorder, the renormalised operator is linear-consistent.
+However, the pointwise convergence order drops as chaos increases.
+It goes from $2.0$ on the lattice to about $0.7$, $0.2$, and $0.1$ at $30$, $60$, and $90\%$ chaos, respectively.
+This matches the $O(1)$ truncation error noted in Section~\ref{sec:operators}.
+In contrast, the GFDM operator maintains the second-order rate.
+The Full Inverse operator tracks the GFDM operator closely, matching it to within plotting accuracy.
+This is because the Full Inverse operator restores the cross-derivative coupling to the renormalised stencil.
+The comparison shows that the loss of consistency is due to the omitted cross terms rather than the renormalised framework itself.
+To recover second-order accuracy, we can reinstate the cross terms at the expense of a small local solve per node.
+Alternatively, we can increase the support radius to recover the convergence order of the renormalised operator.
+At $60\%$ chaos, the order rises to about $1.0$ when we grow the support from $2.5\Delta$ to $3.5\Delta$.
+It reaches about $1.8$ at $5\Delta$, though this requires a wider stencil.
+
+The support is chosen to remain small because the global solution to the boundary value problem is still supraconverged, as demonstrated in Section~\ref{sec:bvp}.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\textwidth]{fig_franke_operator.png}
-  \caption{Pointwise Laplacian approximation error of the Franke function against $\Delta$,
-  for the renormalised operator and two second-order references, the GFDM operator and the
-  same-family Full-Inverse operator of~\cite{Asai2023}, on a regular lattice and at chaos $30$,
-  $60$ and $90\%$. On a regular lattice all operators are second-order. Under disorder the
-  renormalised operator is linear-consistent and its pointwise order falls with the chaos
-  level, whereas the GFDM and Full-Inverse operators, the latter reinstating the
-  cross-derivative coupling, remain close to second-order and overlie one another.}
+  \caption{Pointwise Laplacian approximation error for the Franke function against spacing $\Delta$ on regular and disordered point clouds.}
   \label{fig:franke}
 \end{figure}
 
@@ -810,94 +749,94 @@ problem solution supraconverges at the smaller support, as Section~\ref{sec:bvp}
 \section{Boundary value problem results}
 \label{sec:bvp}
 
-The closures were exercised on a set of Poisson benchmarks on irregular domains, extending
-the cases of~\cite{Gibou2002,Papac2013} and of~\cite{Basic2018}. Refinement is by halving
-$\Delta$, and scattered clouds are tested at chaos $c\in\{30,60,90\}\%$ with median averaging
-over at least twenty realisations. The second-order GFDM operator of Section~\ref{sec:op-gfdm}
-serves as the meshless baseline throughout, with its Neumann flux imposed by the exact
-constraint row and the non-convergent penalty form retained for contrast; for the interior
-operator comparisons the same-family Full-Inverse operator of Section~\ref{sec:op-fi} is also
-included. The non-convergence of the classical SPH Laplacian on irregular clouds was
-established in~\cite{Basic2018} and is not repeated.
-Figure~\ref{fig:maps} previews the closures on each domain. It shows the numerical solution
-carried on the scattered cloud against the exact-solution contours, for the square with a
-Dirichlet condition, the star with a Dirichlet condition, the flower with a Robin condition,
-and the wedge tank with Neumann boundaries and a detected free surface.
+The closures were tested on several Poisson benchmarks in irregular domains.
+These cases extend the work of~\cite{Gibou2002,Papac2013} and~\cite{Basic2018}.
+The discretisation is refined by halving $\Delta$ at each step.
+Scattered point clouds are tested at chaos levels of $30$, $60$, and $90\%$, with results averaged over at least twenty realisations using the median.
+The second-order GFDM operator from Section~\ref{sec:op-gfdm} serves as the main baseline.
+Its Neumann condition is imposed using the exact constraint row, with the penalty form kept for comparison.
+For the interior operator comparisons, the Full Inverse operator described in Section~\ref{sec:op-fi} is also included.
+The classical SPH Laplacian fails to converge on irregular clouds, as established in~\cite{Basic2018}; those tests are not repeated here.
+In Figs.~\ref{fig:maps_a}--\ref{fig:maps_d}, performance on each domain is previewed.
+The numerical solution on the scattered cloud is plotted against the contours of the exact solution.
+The square with a Dirichlet condition, the star with a Dirichlet condition, the flower with a Robin condition, and the wedge tank with Neumann boundaries and a detected free surface are shown.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\textwidth]{fig_solution_maps.png}
-  \caption{Qualitative solution maps. The numerical solution is carried on the scattered
-  cloud, shown in colour, with the exact-solution contours overlaid as lines, at chaos
-  $60\%$. From left to right, the square with a Dirichlet condition and the value closure on a
-  flat boundary, the star with a Dirichlet condition and the curved value closure, the flower
-  with a Robin condition, and the wedge tank with GGP Neumann boundaries, the algebraic-ghost
-  closure and a geometry-detected free surface. The contours pass smoothly through the cloud
-  in every case, including at the curved and non-orthogonal boundaries.}
-  \label{fig:maps}
+  \includegraphics[width=0.55\textwidth]{fig_solution_maps_a.png}
+  \caption{Qualitative solution map for the square domain with a Dirichlet condition and the value closure on a flat boundary.}
+  \label{fig:maps_a}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.55\textwidth]{fig_solution_maps_b.png}
+  \caption{Qualitative solution map for the star domain with a Dirichlet condition and the curved value closure.}
+  \label{fig:maps_b}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.55\textwidth]{fig_solution_maps_c.png}
+  \caption{Qualitative solution map for the flower domain with a Robin condition.}
+  \label{fig:maps_c}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.55\textwidth]{fig_solution_maps_d.png}
+  \caption{Qualitative solution map for the wedge tank with GGP Neumann boundaries, the algebraic-ghost closure, and a geometry-detected free surface.}
+  \label{fig:maps_d}
 \end{figure}
 
 \subsection{Square domain with a Dirichlet condition}
 \label{sec:b1}
 
-The unit square with a manufactured trigonometric solution and the Franke test
-function~\cite{Franke1980} serves as the interior baseline. Figure~\ref{fig:b1} compares the
-renormalised closure with the GFDM baseline and the same-family Full-Inverse
-operator~\cite{Asai2023} at the three chaos levels. The two second-order operators
-retain their pointwise consistency and hold an order near $1.77$ across all
-disorder levels, the Full-Inverse and GFDM curves coinciding, whereas the renormalised
-operator supraconverges at the linear-consistent ceiling, with an order between $1.4$ and
-$1.5$ that degrades only mildly with disorder. The value of the present method does not lie in
-the interior order, where a fully second-order operator is more accurate under strong
-disorder, but in the boundary closure examined in the following benchmarks, and in its
-robustness and absence of tuning; the second-order interior operator and the present boundary
-closure are complementary and could be combined.
+The first baseline is a unit square with a manufactured trigonometric solution and the Franke test function~\cite{Franke1980}.
+In Fig.~\ref{fig:b1}, the renormalised closure is compared against the GFDM baseline and the Full Inverse operator~\cite{Asai2023} at three chaos levels.
+Pointwise consistency is retained by the two second-order operators.
+The method maintains a convergence rate near $1.77$ across all disorder levels, with the curves coinciding.
+In contrast, the renormalised operator achieves supraconvergence at the linear-consistent limit.
+It achieves a convergence rate between $1.4$ and $1.5$ that degrades only slightly with increasing disorder.
+The primary advantage of the proposed method is not its interior convergence rate.
+Indeed, a fully second-order operator attains higher accuracy under strong disorder.
+Rather, the value lies in the boundary closure, which we examine in the next benchmarks, as well as in the robustness and the absence of tuning parameters.
+The second-order interior operator and the boundary closure introduced here are complementary, and we can combine them easily.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\textwidth]{fig_b1_dirichlet.png}
-  \caption{Square domain with a Dirichlet condition and a trigonometric solution. Normalised
-  RMSE against $\Delta$ for the renormalised closure FIRM and two second-order baselines, the
-  GFDM operator and the same-family Full-Inverse operator of~\cite{Asai2023}, at chaos $30$,
-  $60$ and $90\%$. The renormalised operator supraconverges at an order of about $1.4$ to
-  $1.5$, while the GFDM and Full-Inverse operators retain their second-order interior order of
-  about $1.8$ and coincide.}
+  \caption{Convergence of the Dirichlet Poisson solution error on a square domain under different chaos levels.}
   \label{fig:b1}
 \end{figure}
 
 \subsection{Neumann boundaries by projection, algebraic ghost and GFDM constraint row}
 \label{sec:nb}
 
-The all-Neumann unit box, closed by a zero-mean constraint, isolates the Neumann treatment.
-Table~\ref{tab:neumann} and Figure~\ref{fig:neumann} compare four closures, namely the FIRM
-projection closure, the FIRM algebraic-ghost closure, the GFDM exact constraint row and the
-GFDM penalty form. The two flux-only closures, FIRM projection and the GFDM constraint row,
-behave alike. Both impose the flux exactly yet leave the normal second derivative one-sided,
-and both converge only slowly, at order about $0.9$, and carry a large error constant, with
-the Neumann term dominating the pure-Neumann error. The penalty form is indistinguishable from
-the constraint row, which confirms that a soft flux is not the deficiency. The algebraic-ghost
-closure, which completes the stencil, is about eight times more accurate at the finest
-resolution, $4.7\times10^{-3}$ against $3.9\times10^{-2}$. The all-Neumann box is singular up to
-an additive constant, so its per-closure order is dominated by the null-space handling and is
-not a reliable rate. The convergence rate is therefore reported on the well-posed wedge tank of
-Section~\ref{sec:b6}, where the ghost closure lifts the Neumann-region order from about $1.0$ to
-between $1.3$ and $1.8$, so the Neumann region converges at roughly the rate of the interior. It
-should be noted that the algebraic-ghost
-closure outperforms the GFDM constraint row here because completing the stencil supplies the
-curvature that an exactly imposed flux does not. A high-order Neumann treatment would instead
-require the staggered KKT construction of Trask et al.~\cite{Trask2017}, which is noted as
-future work.
+We use an all-Neumann unit box closed by a zero-mean constraint to isolate the Neumann treatment.
+In Table~\ref{tab:neumann} and Fig.~\ref{fig:neumann}, we compare four distinct closures: the FIRM projection closure, the FIRM algebraic-ghost closure, the GFDM exact constraint row, and the GFDM penalty form.
+The two flux-only closures (FIRM projection and the GFDM constraint row) exhibit similar behaviour.
+Both impose the flux exactly, but leave the normal second derivative one-sided.
+Consequently, we obtain slow convergence, with an order of about $0.9$.
+They also carry a large error constant, with the Neumann boundary dominating the error.
+The penalty form is virtually indistinguishable from the constraint row.
+This similarity confirms that the issue is not a soft flux implementation.
+The algebraic-ghost closure completes the stencil.
+As a result, we achieve an error reduction of about eight times at the finest resolution, yielding an error of $4.7\times10^{-3}$ compared to $3.9\times10^{-2}$.
+Because the all-Neumann box is singular up to an archetype scalar constant, how we handle the null space heavily influences the convergence rate for each closure.
+This makes the box a poor case for measuring convergence rates.
+Therefore, we report the convergence rate on the well-posed wedge tank in Section~\ref{sec:b6}.
+On that domain, the ghost closure lifts the Neumann-region order from about $1.0$ to between $1.3$ and $1.8$.
+Thus, the Neumann boundary converges at roughly the same rate as the interior.
+Importantly, the algebraic-ghost closure outperforms the GFDM constraint row because completing the stencil supplies the local curvature.
+An exactly imposed flux alone does not provide this information.
+A fully high-order Neumann treatment would require the staggered KKT approach of Trask et al.~\cite{Trask2017}, which we leave for future research.
 
 \begin{table}[t]
   \centering
-  \caption{All-Neumann box at chaos $30\%$, normalised mean-removed RMSE against $\Delta$. The
-  two flux-only closures, FIRM projection and the GFDM constraint row, stall at a large
-  constant set by the one-sided normal curvature, and the penalty form is indistinguishable from
-  the constraint row. The FIRM algebraic-ghost closure is about an order of magnitude lower. The
-  box is singular up to an additive constant, so its per-closure order is set by the null-space
-  handling and is not reported here. The convergence rate is reported on the well-posed wedge
-  tank in Section~\ref{sec:b6}. Seed-averaged values from the verification suite.}
+  \caption{Poisson solution error on the all-Neumann box under $30\%$ chaos for different boundary closures.}
   \label{tab:neumann}
+  \resizebox{\textwidth}{!}{%
   \begin{tabular}{lcccc}
     \toprule
     $\Delta$ & FIRM projection & FIRM ghost & GFDM constraint & GFDM penalty \\
@@ -907,234 +846,212 @@ future work.
     0.025 & $6.0\times10^{-2}$ & $2.2\times10^{-3}$ & $6.7\times10^{-2}$ & $6.7\times10^{-2}$ \\
     0.018 & $3.9\times10^{-2}$ & $4.7\times10^{-3}$ & $4.7\times10^{-2}$ & $4.7\times10^{-2}$ \\
     \bottomrule
-  \end{tabular}
+  \end{tabular}%
+  }
 \end{table}
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\textwidth]{fig_neumann_baseline.png}
-  \caption{Neumann boundaries on the all-Neumann box. The FIRM algebraic-ghost closure is
-  compared against the flux-only closures, namely FIRM projection, the GFDM constraint row and
-  the GFDM penalty form, at chaos $30\%$ and $60\%$. Completing the boundary stencil restores
-  accuracy that an exactly imposed flux alone does not.}
+  \caption{Comparison of Poisson solution error under Neumann boundary conditions on a square box for different closures.}
   \label{fig:neumann}
 \end{figure}
 
 \subsection{Normalisation of the ghost closure}
 \label{sec:neustraight}
 
-The order to which the algebraic-ghost closure converges depends on the normalisation of the
-completed row. This is isolated on a square with a single straight Neumann edge at $y=0$ and
-Dirichlet conditions on the other three edges, which is well-posed and free of the corner
-truncation of Section~\ref{sec:ghost}. Figure~\ref{fig:neustraight} reports the error on the
-Neumann edge against $\Delta$. The projection closure converges at order about $0.8$. The ghost
-closure with the smooth-naive normalisation, Eq.~\eqref{eq:N}, improves the constant by an order
-of magnitude but its error plateaus, at an order of about $1.4$. The ghost closure with the sum
-normalisation, Eq.~\eqref{eq:Nden}, which is exact for $|\mathbf x|^2$, removes the plateau and
-continues to converge, at an order of about $1.8$, approaching second order. On the completed,
-near-symmetric support the two forms differ only through the residual anisotropy, and the sum
-form, by reproducing the curvature of $|\mathbf x|^2$ exactly, supplies the normal second
-derivative that the smooth-naive form leaves biased. The sum normalisation is therefore preferred
-for the ghost closure on straight and smoothly curved Neumann boundaries. At a non-orthogonal
-corner the rate is instead capped by the truncated reflection group of Section~\ref{sec:ghost},
-where the more robust smooth-naive form is retained, as Section~\ref{sec:b6} shows.
+How we normalise the completed row determines the convergence order of the algebraic-ghost closure.
+We isolate this effect on a square domain with a single straight Neumann boundary at $y=0$ and Dirichlet conditions on the other three edges.
+This problem is well-posed and free of the corner truncation discussed in Section~\ref{sec:ghost}.
+In Fig.~\ref{fig:neustraight}, we report the error along the Neumann edge against the spacing $\Delta$.
+The projection closure achieves convergence at an order of about $0.8$.
+Using the ghost closure with the smooth-naive normalisation from Eq.~\eqref{eq:N} improves the error constant by an order of magnitude.
+However, the error eventually reaches a plateau at about $1.4$.
+The ghost closure with the sum normalisation from Eq.~\eqref{eq:Nden} is exact for $|\mathbf x|^2$.
+This removes the plateau, and convergence continues at a rate of about $1.8$, approaching second-order accuracy.
+On the completed and near-symmetric support, the two formulations differ only due to residual anisotropy.
+By reproducing the curvature of $|\mathbf x|^2$ exactly, the sum normalisation supplies the normal second derivative.
+In contrast, the smooth-naive normalisation leaves this derivative biased.
+Therefore, we prefer the sum normalisation for the ghost closure on straight and smoothly curved Neumann boundaries.
+At a non-orthogonal corner, the truncated reflection group of Section~\ref{sec:ghost} caps the convergence rate.
+In those regions, we retain the more robust smooth-naive formulation, as shown in Section~\ref{sec:b6}.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=0.62\textwidth]{fig_neumann_straight.png}
-  \caption{Straight Neumann edge, error on the edge against $\Delta$. The projection closure
-  converges at order about $0.8$. The ghost closure with the smooth-naive normalisation plateaus
-  at order about $1.4$, whereas the ghost closure with the sum normalisation
-  approaches second order. Seed-averaged over sixteen realisations.}
+  \caption{Neumann boundary error convergence along a straight edge under the projection and ghost closures.}
   \label{fig:neustraight}
 \end{figure}
 
 \subsection{Star domain with Dirichlet and Neumann conditions}
 \label{sec:b2}
 
-A star-shaped domain $r(\theta)=0.5+0.2\sin5\theta$, after~\cite{Gibou2002}, with a
-trigonometric manufactured solution, exercises the closures on a curved boundary. The
-boundary is finely faceted, and the residual faceting error is held below the solution error.
-For the Dirichlet condition the value closure of Section~\ref{sec:surface} is used with the
-local boundary normal and distance, and it supraconverges at order about $1.85$, in line with
-the GFDM baseline at about $1.4$. For the Neumann condition the projection closure is again the
-limiter at order about $0.8$, while the algebraic-ghost closure improves both the constant and
-the order to about $1.7$. The GFDM constraint row tracks the projection closure at about $0.9$,
-as on the box. Figure~\ref{fig:b2} collects the curves.
+We test the closures on a curved boundary using a star-shaped domain $r(\theta)=0.5+0.2\sin5\theta$, following~\cite{Gibou2002}, with a trigonometric manufactured solution.
+We represent the boundary with fine facets, keeping the residual faceting error well below the solution error.
+For the Dirichlet boundary condition, we apply the value closure from Section~\ref{sec:surface} using the local boundary normal and distance.
+This configuration achieves supraconvergence at an order of about $1.85$, outperforming the GFDM baseline which converges at about $1.4$.
+For the Neumann condition, the projection closure acts as the main bottleneck, converging at about $0.8$.
+The algebraic-ghost closure improves both the error constant and the convergence order, lifting it to about $1.7$.
+The GFDM constraint row closely tracks the projection closure at about $0.9$, matching the findings on the box domain.
+We collect these convergence curves in Fig.~\ref{fig:b2}.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\textwidth]{fig_b2_curved.png}
-  \caption{Star domain. The value closure for the Dirichlet condition and the flux closures
-  for the Neumann condition on a curved boundary, at chaos $30\%$ and $60\%$. The Dirichlet
-  value closure supraconverges, and among the Neumann closures the algebraic ghost is the most
-  accurate.}
+  \caption{Convergence of Dirichlet and Neumann Poisson solutions on a curved star domain under boundary disorder.}
   \label{fig:b2}
 \end{figure}
 
 \subsection{Flower domain with a Robin condition}
 \label{sec:b3}
 
-A flower-shaped domain with a Robin condition $\partial u/\partial n+\alpha u=f$ exercises the
-value-dependent flux closure. The boundary value, which is unknown, is eliminated by the local
-Taylor relation along the perpendicular foot, $u(\mathbf x_f)=u_i+\delta\,\partial u/\partial n$.
-Substituting this into the Robin condition $\partial u/\partial n+\alpha\,u(\mathbf x_f)=f$ and
-solving for the normal flux gives
+We use a flower-shaped domain to test the value-dependent flux closure with a Robin condition $\partial u/\partial n+\alpha u=f$.
+Because the boundary value is unknown, we eliminate it using a local Taylor expansion along the normal direction to the boundary: $u(\mathbf x_f)=u_i+\delta\,\partial u/\partial n$.
+We substitute this relation into the Robin condition, $\partial u/\partial n+\alpha\,u(\mathbf x_f)=f$, and solve for the normal flux:
 \begin{equation}
-  g=\frac{\partial u}{\partial n}=\frac{f-\alpha u_i}{1+\alpha\delta},
+  g=\frac{\partial u}{\partial n}=\frac{f-\alpha u_i}{1+\alpha\delta}.
   \label{eq:robin}
 \end{equation}
-whose known part $f/(1+\alpha\delta)$ enters the flux right-hand side exactly as in
-Eq.~\eqref{eq:bwall}, while the value-dependent part $-\alpha u_i/(1+\alpha\delta)$ is linear
-in the unknown and moves to the diagonal, contributing $\alpha/(1+\alpha\delta)$ times the
-geometric weight $(\mathbf N^\top\oi)^\top\mathbf G^{-1}\mathbf 1$. Equation~\eqref{eq:robin}
-recovers the Neumann closure as $\alpha\to0$, where $g\to f$ and there is no diagonal term,
-and the Dirichlet value closure as $\alpha\to\infty$, where $g\to(f/\alpha-u_i)/\delta$, and it
-remains linear-exact for straight segments. The realised order rises from about $0.9$ at chaos
-$30\%$ to about $1.1$ at chaos $90\%$, consistent with a flux-type closure, as shown in
-Figure~\ref{fig:b3}.
+The known term, $f/(1+\alpha\delta)$, enters the right-hand side of the flux equations, matching Eq.~\eqref{eq:bwall}.
+The value-dependent term, $-\alpha u_i/(1+\alpha\delta)$, is linear in the unknown value $u_i$.
+We move it to the diagonal of the row, where $\alpha/(1+\alpha\delta)$ times the geometric weight $(\mathbf N^\top\oi)^\top\mathbf G^{-1}\mathbf 1$ makes a contribution.
+Equation~\eqref{eq:robin} simplifies to the pure Neumann closure in the limit as $\alpha\to0$.
+In that limit, we obtain $g\to f$, with no diagonal modification.
+As $\alpha\to\infty$, we recover the Dirichlet value closure, where $g\to(f/\alpha-u_i)/\delta$.
+This formulation remains exact for linear fields on straight boundary segments.
+The realised convergence rate ranges from about $0.9$ at $30\%$ chaos to $1.1$ at $90\%$ chaos.
+This is consistent with a flux-type boundary treatment, as Figure~\ref{fig:b3} shows.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=0.6\textwidth]{fig_b3_robin.png}
-  \caption{Flower domain with the Robin condition $\partial u/\partial n+u=f$. Normalised RMSE
-  against $\Delta$ at chaos $30$, $60$ and $90\%$.}
+  \caption{Robin boundary condition convergence on a curved flower domain against the spacing $\Delta$ for different chaos levels.}
   \label{fig:b3}
 \end{figure}
 
 \subsection{Free-surface detection from the cloud}
 \label{sec:b5}
 
-This benchmark treats the upper boundary of a polygonal tank as an unknown free surface,
-detected from the cloud by the indicator $\lambda_i$ and the smoothstep activation of
-Section~\ref{sec:surface}, with no surface particles and no prescribed geometry. The detector
-separates the interior from the surface. The interior indicator is $\lambda^{(90)}\approx0.2$,
-well below the activation threshold $\tfrac23$. The outermost surface ring has
-$\lambda\approx0.7$ to $0.9$. The interior activation is identically zero, with no false
-activation at any tested resolution or disorder, and the recovered surface normal agrees with
-the true vertical to within a few percent. The geometry-detected closure tracks a
-prescribed-boundary reference. The surface-region error of the detected, or natural, closure
-converges at order about $1.5$, close to but slightly below the prescribed, or exact,
-reference at about $2.2$, with no tuning parameter. Figure~\ref{fig:b5} shows the detected
-activation field on the tank and the detected-versus-prescribed convergence. For comparison,
-the rational activation $\sigma=\lambda^2/(\lambda^2+c^2)$ with a fixed $c$ over-activates the
-interior at strong disorder, whereas the smoothstep remains pinned at zero, which motivates
-the parameter-free choice.
+In this benchmark, we treat the upper boundary of a polygonal tank as an unknown free surface.
+We detect it directly from the point cloud using the indicator $\lambda_i$ and the smoothstep activation function described in Section~\ref{sec:surface}.
+We do not use surface particles or prescribed boundary geometry.
+The detector achieves a clear separation between the interior and surface nodes.
+For example, the interior indicator value is $\lambda^{(90)}\approx0.2$, which sits well below the activation threshold of $\tfrac23$.
+The outermost surface ring yields values between $\lambda\approx0.7$ and $0.9$.
+The interior activation is zero.
+We observed no false activations at any of the tested resolutions or disorder levels.
+Furthermore, the recovered surface normal matches the analytical vertical direction to within a few percent.
+The geometry-detected closure closely tracks the exact-boundary reference.
+The error in the surface region for the detected closure converges at an order of about $1.5$.
+This is close to, but slightly below, the exact reference rate of $2.2$, and requires no tuning parameters.
+We plot the detected activation field and compare convergence rates in Figs.~\ref{fig:b5_a} and~\ref{fig:b5_b}.
+For comparison, we also tested a rational activation function, $\sigma=\lambda^2/(\lambda^2+c^2)$, with a fixed parameter $c$.
+This alternative function false-triggers in the interior under strong particle disorder.
+The smoothstep function remains pinned at zero, which justifies this parameter-free choice.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\textwidth]{fig_b5_surface.png}
-  \caption{Free-surface detection from the cloud. (a) The geometry-detected activation
-  $\sigma_i$ on the jittered tank, identically zero in the interior and rising to unity at the
-  surface. (b) The detected, or natural, surface closure converges on top of the prescribed,
-  or exact, reference, with no tuning parameter.}
-  \label{fig:b5}
+  \includegraphics[width=0.55\textwidth]{fig_b5_surface_a.png}
+  \caption{Geometry-detected activation $\sigma_i$ on the jittered tank, which is zero in the interior and rises to unity at the surface.}
+  \label{fig:b5_a}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.55\textwidth]{fig_b5_surface_b.png}
+  \caption{Convergence of the detected surface closure compared to the prescribed reference without using any tuning parameters.}
+  \label{fig:b5_b}
 \end{figure}
 
 \subsection{Non-orthogonal wedge with a free surface}
 \label{sec:b6}
 
-A polygonal tank with a non-orthogonal slant-and-floor wedge and a free surface combines all
-closures on a complex manufactured field $p^\star=\sin\pi x\cos\pi y+0.3(x^2+y^2)$. At the
-wedge the GGP projector is exact for a linear field, with relative error $\sim10^{-14}$,
-whereas AN leaks $O(\Delta)$, with relative error $\sim3\times10^{-2}$, as predicted in
-Section~\ref{sec:wall}. For the complex field the error concentrates on the boundaries and the
-wedge and vanishes towards the free surface, so the Neumann region is the accuracy-limiter
-under the projection closure, where it converges at order about $1.0$. Replacing the projection
-closure by the algebraic-ghost closure reduces the Neumann-region error by about an order of
-magnitude, from $1.0\times10^{-2}$ to $7.6\times10^{-4}$ at the finest resolution, and lifts the
-Neumann-region order to about $1.3$ over the full range and about $1.8$ over the fine range. The
-Neumann region thereby converges at roughly the rate of the interior and the Dirichlet
-boundary, of about $1.4$ to $1.8$, rather than at the reduced rate of the projection closure,
-so it is no longer the limiter. The errors are seed-averaged over six realisations. The corner
-double reflection and the self-reflection are both required for this. These results are shown
-in Figure~\ref{fig:convergence}, and the error field in Figure~\ref{fig:errorfield}.
+We use a polygonal tank with a non-orthogonal slant-and-floor wedge and a free surface to test all closures together on a complex manufactured field: $p^\star=\sin\pi x\cos\pi y+0.3(x^2+y^2)$.
+At the wedge boundary, the GGP projector is exact for linear fields, yielding a relative error of $\sim10^{-14}$.
+In contrast, the AN projector introduces an $O(\Delta)$ leakage, with a relative error of $\sim3\times10^{-2}$.
+This matches the prediction in Section~\ref{sec:wall}.
+For the manufactured field, the error concentrates near the solid boundaries and the corner wedge.
+It vanishes near the free surface.
+The Neumann boundary thus acts as the main convergence bottleneck under the projection closure, where we obtain convergence at an order of $1.0$.
+Replacing the projection closure with the algebraic-ghost closure reduces the error in the Neumann region by about an order of magnitude.
+At the finest resolution, the error drops from $1.0\times10^{-2}$ to $7.6\times10^{-4}$.
+Furthermore, the ghost closure lifts the convergence rate in the Neumann region to about $1.3$ over the full range and about $1.8$ in the asymptotic range.
+The Neumann region now converges at roughly the same rate as the interior and the Dirichlet boundary, which converge at rates of $1.4$ to $1.8$.
+Thus, the Neumann boundary is no longer the bottleneck.
+We average these errors over six random seed realisations.
+We find that both the corner double reflection and the self-reflection of boundary nodes are necessary to achieve this rate.
+We present these convergence results in Fig.~\ref{fig:convergence}, and show the spatial distribution of the error in Fig.~\ref{fig:errorfield}.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\textwidth]{fig_convergence.png}
-  \caption{Wedge tank, seed-averaged over six realisations. Left, the Neumann-region RMS for
-  the projection and algebraic-ghost closures. Right, the overall error for the two closures.
-  The ghost closure lowers the Neumann-region error by about an order of magnitude and lifts its
-  order to roughly the interior rate, so the Neumann region is no longer the limiter.}
+  \caption{Neumann-region and overall Poisson solution errors on the wedge tank for different closures.}
   \label{fig:convergence}
 \end{figure}
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=0.7\textwidth]{capstone_error_field.png}
-  \caption{Wedge tank. Pointwise error $|p-p^\star|$ for the GGP closure with the prescribed
-  surface at the finest resolution. The error concentrates on the boundaries and the wedge and
-  vanishes toward the free surface, which identifies the Neumann closure as the limiter.}
+  \caption{Pointwise Poisson solution error on the wedge tank under GGP wall and prescribed surface closures.}
   \label{fig:errorfield}
 \end{figure}
 
 \subsection{Kernel, support radius and disorder robustness}
 \label{sec:b7}
 
-The operators are kernel-agnostic in that linear-exactness holds for the poly6 $(1-q^2)^3$,
-the spiky $(1-q)^3$ and the Wendland-C2 kernels at every support radius. The solution accuracy
-is not. At matched support the poly6 kernel uses its neighbours most evenly and is the most
-accurate at small support. For example, at $h=2.0\Delta$ the Poisson error is
-$2.3\times10^{-3}$ for poly6 against $6.6\times10^{-3}$ for the spiky kernel. The concentrated
-spiky kernel is competitive only at $h\gtrsim2.5\Delta$, where the small-support advantage is
-lost. The default $h=2.5\Delta$ is robust, with about fifteen interior and at least four
-boundary neighbours at chaos $60\%$. A smaller $h\in[2.0,2.25]\Delta$ is viable for
-quasi-uniform clouds, with the algebraic-ghost closure relieving the boundary-truncation
-constraint, while $h\le2.2\Delta$ hits the two-dimensional rank floor of three neighbours under
-strong disorder and becomes noisy. Across chaos $0$ to $80\%$ the operators remain
-linear-exact, the condition number of $\Mi$ rises smoothly from $1.9$ to about $6$ while $\Mi$
-stays invertible, the smoothstep activation never false-triggers the interior, and the
-denominator-normalisation edge widens with anisotropy. These trends are collected in
-Figures~\ref{fig:kernel} and~\ref{fig:jitter}.
+The operators are kernel-agnostic.
+Linear exactness holds for the poly6 $(1-q^2)^3$, the spiky $(1-q)^3$, and the Wendland-C2 kernels at any support radius.
+However, this independence does not extend to the solution accuracy.
+At the same support radius, the poly6 kernel weights neighbours most evenly, making it the most accurate choice at small support sizes.
+For instance, at $h=2.0\Delta$, the Poisson solution error is $2.3\times10^{-3}$ using the poly6 kernel compared to $6.6\times10^{-3}$ with the spiky kernel.
+The spiky kernel only becomes competitive when the support is relatively large, around $h\ge2.5\Delta$.
+This, however, removes the advantage of a small support.
+We find the default setting of $h=2.5\Delta$ to be highly robust.
+It provides about fifteen interior neighbours and at least four boundary neighbours at $60\%$ chaos.
+We find that a smaller support of $h\in[2.0,2.25]\Delta$ works well for quasi-uniform point clouds, as the algebraic-ghost closure relieves the boundary truncation constraint.
+Reducing the support below $h\le2.2\Delta$ runs the risk of falling below the two-dimensional rank limit of three neighbours under strong disorder, which leads to numerical noise.
+Across chaos levels from $0$ to $80\%$, the operators remain exact for linear fields.
+The condition number of the moment matrix $\Mi$ rises smoothly from $1.9$ to about $6$, and $\Mi$ remains invertible.
+The smoothstep activation function never false-triggers in the interior.
+Additionally, the benefit of the denominator normalisation grows with anisotropy.
+We collect these trends in Figs.~\ref{fig:jitter} and~\ref{fig:kernel_radius}.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\textwidth]{fig_kernel_radius.png}
-  \caption{Kernel and support radius at chaos $60\%$. (a) Pointwise Laplacian error. (b)
-  Poisson solution error, lowest and most robust for poly6 at small support. (c) Minimum
-  neighbour count, showing the two-dimensional rank floor at small radius.}
+  \caption{Effect of kernel shape and support radius on the pointwise Laplacian error, Poisson solution error, and minimum neighbour count.}
   \label{fig:kernel}
 \end{figure}
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\textwidth]{fig_jitter.png}
-  \caption{Disorder robustness. (a) Poisson error against disorder for the two
-  normalisations. (b) The denominator-to-trace error ratio narrowing with disorder. (c) The
-  condition number of $\Mi$. (d) Interior surface false-activation, zero for the smoothstep and
-  growing for a fixed-parameter rational activation.}
+  \caption{Disorder robustness of the Poisson solver showing the error, normalisation ratios, matrix condition numbers, and false surface activations.}
   \label{fig:jitter}
 \end{figure}
 
-% =============================================================================
+% ===============
 \section{Application to the Helmholtz--Hodge decomposition}
 \label{sec:hodge}
 
-A natural application of the closure is the discrete Helmholtz--Hodge decomposition, in which a
-vector field is split into a divergence-free part and the gradient of a scalar potential. The
-pressure projection of an incompressible-flow solver is its best-known special case, but the
-decomposition is generic and arises wherever a field must be projected onto its divergence-free
-part; the treatment here is kept in those general terms. Given a vector field $\mathbf u^\ast$,
-the decomposition $\mathbf u^\ast=\mathbf u+\nabla\phi$ with $\nabla\!\cdot\mathbf u=0$ is
-computed by solving a scalar Poisson problem for the potential and subtracting its gradient,
+The discrete Helmholtz-Hodge decomposition provides a natural application of the boundary closure.
+Here, we split a vector field into a divergence-free part and the gradient of a scalar potential.
+The pressure projection in incompressible flow solvers is the best-known special case.
+However, this decomposition is general.
+It arises wherever we must project a field onto its solenoidal component.
+We keep the discussion in these general terms.
+If we consider a vector field $\mathbf u^\ast$, we compute the decomposition $\mathbf u^\ast=\mathbf u+\nabla\phi$ with $\nabla\!\cdot\mathbf u=0$ by solving a scalar Poisson problem for the potential $\phi$:
 \begin{equation}
-  \mathsf L\,\phi=\langle\nabla\!\cdot\mathbf u^\ast\rangle,\qquad
-  \mathbf u=\mathbf u^\ast-\gradop{\phi},
+  \mathsf L\,\phi=\langle\nabla\!\cdot\mathbf u^\ast\rangle,
   \label{eq:projection}
 \end{equation}
-where $\mathsf L$ is the renormalised Laplacian with the boundary closure of
-Section~\ref{sec:closure}, the divergence
-$\langle\nabla\!\cdot\mathbf u^\ast\rangle_i=\sum_c\mathbf e_c\cdot\gradop{u^\ast_c}_i$ is the
-trace of the component-wise renormalised gradient~\eqref{eq:grad}, and the potential satisfies a
-Neumann condition at a wall and a value condition at a free surface, by the
-boundary-condition-by-type principle of Section~\ref{sec:closure}. A concern specific to a
-meshless, collocated discretisation is that the operators are not mutually adjoint: the
-single-sum Laplacian~\eqref{eq:lap} is not the composition of the discrete divergence and
-gradient, $\mathsf L\neq\mathsf D\mathsf G$, where $\mathsf D$ and $\mathsf G$ denote the
-divergence and gradient matrices. Subtracting the gradient therefore does not annihilate the
-divergence exactly, and the residual divergence of the computed solenoidal part is, by
-Eq.~\eqref{eq:projection},
+where we define the projected velocity as $\mathbf u=\mathbf u^\ast-\gradop{\phi}$. In this equation, $\mathsf L$ represents the renormalised Laplacian with the boundary closure of Section~\ref{sec:closure}.
+The divergence term $\langle\nabla\!\cdot\mathbf u^\ast\rangle_i=\sum_c\mathbf e_c\cdot\gradop{u^\ast_c}_i$ is the trace of the component-wise renormalised gradient in Eq.~\eqref{eq:grad}.
+The potential satisfies a Neumann condition at solid walls, and a value condition at the free surface, following the boundary-condition-by-type principle of Section~\ref{sec:closure}.
+A key concern for meshless, collocated discretisations is that the operators are not mutually adjoint.
+Specifically, the single-sum Laplacian does not exactly compose the discrete divergence and gradient operators: $\mathsf L\neq\mathsf D\mathsf G$, where $\mathsf D$ and $\mathsf G$ represent the divergence and gradient matrices.
+Consequently, subtracting the gradient does not completely annihilate the divergence.
+We evaluate the residual divergence of the computed solenoidal part using Eq.~\eqref{eq:projection}:
 \begin{equation}
   \langle\nabla\!\cdot\mathbf u\rangle
   =\langle\nabla\!\cdot\mathbf u^\ast\rangle-\mathsf D\mathsf G\,\phi
@@ -1142,130 +1059,77 @@ Eq.~\eqref{eq:projection},
   =(\mathsf L-\mathsf D\mathsf G)\,\phi.
   \label{eq:projresidual}
 \end{equation}
-The residual divergence is exactly the operator commutation defect
-$(\mathsf L-\mathsf D\mathsf G)$ applied to the computed potential. It vanishes identically for
-a staggered finite-difference or finite-volume discretisation, for which
-$\mathsf L=\mathsf D\mathsf G$ and the decomposition is exact, and is otherwise a measure of the
-operators' non-adjointness. The question is whether this residual is small and whether it
-vanishes under refinement.
+The residual divergence is exactly the operator commutation defect $(\mathsf L-\mathsf D\mathsf G)$ acting on the potential.
+The defect vanishes identically for staggered finite-difference or finite-volume discretisations.
+For those methods, we obtain $\mathsf L=\mathsf D\mathsf G$, making the decomposition exact.
+In this meshless case, we measure the non-adjointness of the operators.
+We must therefore answer two questions: is this residual small, and does it vanish under refinement?
 
-A manufactured Helmholtz--Hodge decomposition provides an analytic ground truth. With a
-stream function $\psi=\sin\pi x\,\sin\pi y$ and a potential $\phi^\star=\cos2\pi x\,\cos2\pi y$,
-the field
+We construct a manufactured Helmholtz-Hodge decomposition to provide an analytical ground truth. We define the stream function as $\psi=\sin\pi x\,\sin\pi y$ and the potential as $\phi^\star=\cos2\pi x\,\cos2\pi y$. With these components, we build the field:
 \begin{equation}
-  \mathbf u^\ast=\nabla^\perp\!\psi+\nabla\phi^\star,\qquad
-  \nabla^\perp\!\psi=(\partial_y\psi,\,-\partial_x\psi),
+  \mathbf u^\ast=\nabla^\perp\!\psi+\nabla\phi^\star,
   \label{eq:hodgefield}
 \end{equation}
-has the known divergence $\nabla\!\cdot\mathbf u^\ast=\nabla^2\phi^\star$, the exact potential
-$\phi^\star$ up to a constant, and the exact divergence-free part $\nabla^\perp\!\psi$, which is
-solenoidal by construction and tangential to the unit-box boundary since $\psi$ vanishes there.
-The Neumann datum on a wall is the prescribed $\nabla\phi^\star\!\cdot\mathbf n$, so the
-decomposition is exact on any domain, including the wedge tank of Section~\ref{sec:bvp}. The
-discrete divergence $\langle\nabla\!\cdot\mathbf u^\ast\rangle$ is used as the source in
-Eq.~\eqref{eq:projection}, as it would be in a solver, so that the identity~\eqref{eq:projresidual}
-holds discretely.
+where we define the skew gradient as $\nabla^\perp\!\psi=(\partial_y\psi,\,-\partial_x\psi)$. This field has a known divergence, $\nabla\!\cdot\mathbf u^\ast=\nabla^2\phi^\star$.
+We also possess the analytical potential $\phi^\star$ (up to a constant) and a divergence-free component $\nabla^\perp\!\psi$.
+This solenoidal component is tangential to the boundaries of the unit box because $\psi$ vanishes along them.
+We prescribe the Neumann boundary condition on solid walls using $\nabla\phi^\star\!\cdot\mathbf n$.
+This ensures the decomposition remains exact on any domain, including the wedge tank from Section~\ref{sec:bvp}.
+We feed the discrete divergence $\langle\nabla\!\cdot\mathbf u^\ast\rangle$ as the source term in Eq.~\eqref{eq:projection}, mimicking a real solver.
+This ensures that the identity in Eq.~\eqref{eq:projresidual} holds discretely.
 
-Equation~\eqref{eq:projresidual} is confirmed to round-off, the directly measured residual
-matching $(\mathsf L-\mathsf D\mathsf G)\phi$ to $\sim10^{-13}$ on the interior. A single
-decomposition removes $80$ to $95\%$ of the divergence, and the residual converges under
-refinement, at order $1.2$ on a regular lattice, $1.0$ on the wedge tank, and $0.4$ on the box
-at chaos $60\%$ with the projection Neumann closure, mirroring the supraconvergent solution
-orders of Section~\ref{sec:bvp}. The algebraic-ghost closure lowers the box residual by about a
-third and sharply improves the recovered potential, raising its order from $0.9$ to $1.7$, but
-it leaves the residual-divergence rate at about $0.4$, in contrast to the marked improvement it
-brings to the Poisson solution rate in Section~\ref{sec:bvp}. That a better wall closure
-improves the potential yet not the divergence rate is a first sign that the residual is limited
-by the divergence--gradient pairing and not by the Laplacian closure, which the operator
-comparison below makes precise. Figure~\ref{fig:hodge}(a) shows the residual against $\Delta$
-for both closures on the box and for the wedge tank. The decomposition is
-non-expansive, the solenoidal part carrying less energy than the field,
-$\|\mathbf u\|/\|\mathbf u^\ast\|\approx0.47$, and the discrete inner product
-$\langle\mathbf u,\gradop{\phi}\rangle$ between the two parts vanishes under refinement, so the
-decomposition becomes orthogonal in the limit. The renormalised operators are therefore
-consistent for a single decomposition: the residual divergence is precisely the non-adjointness
-defect, and that defect vanishes as $\Delta\to0$.
+We confirmed the relation in Eq.~\eqref{eq:projresidual} to round-off error.
+The directly measured divergence matches the commutation defect $(\mathsf L-\mathsf D\mathsf G)\phi$ to within $\sim10^{-13}$ in the interior.
+A single projection step removes between $80$ and $95\%$ of the initial divergence.
+Furthermore, the residual exhibits convergence under refinement.
+The projection Neumann closure yields an order of $1.2$ on a regular lattice, $1.0$ on the wedge tank, and $0.4$ on the box at $60\%$ chaos.
+These rates mirror the supraconvergent solution orders reported in Section~\ref{sec:bvp}.
+The algebraic-ghost closure lowers the residual divergence on the box by about a third.
+It also significantly improves the accuracy of the potential, raising its convergence order from $0.9$ to $1.7$.
+However, the ghost closure leaves the convergence rate of the residual divergence at about $0.4$.
+This is in contrast to the substantial speedup brought to the Poisson solution in Section~\ref{sec:bvp}.
+The fact that an improved wall closure improves the potential but not the divergence convergence rate is telling.
+It indicates that the divergence-gradient pairing itself, rather than the Laplacian closure, limits the residual.
+The operator comparison makes this point precise.
+In Fig.~\ref{fig:hodge}(a), we plot the residual divergence against $\Delta$ for both closures on the box and the wedge tank.
+The decomposition is non-expansive.
+The solenoidal part carries less energy than the original field: $\|\mathbf u\|/\|\mathbf u^\ast\|\approx0.47$.
+Moreover, the discrete inner product $\langle\mathbf u,\gradop{\phi}\rangle$ between the solenoidal and potential components vanishes under refinement.
+This shows that the decomposition becomes orthogonal in the limit.
+Thus, we show that the renormalised operators are consistent for a single decomposition step.
+The residual divergence is exactly the non-adjointness defect, and this defect vanishes as $\Delta\to0$.
 
-The choice of Laplacian was then isolated. On an all-Dirichlet box, which every operator can
-solve, the same renormalised gradient was used for $\mathsf D$ and $\mathsf G$ while the
-Laplacian $\mathsf L$ in Eq.~\eqref{eq:projection} was varied across the uncorrected summation
-$N_i\sum_j W_{ij}f_{ij}$, obtained by setting $w_{ij}=1$ in Eq.~\eqref{eq:lap}, the present
-renormalised operator in its smooth-naive and sum normalisations, the GFDM operator of
-Section~\ref{sec:bvp}, and the Full-Inverse operator of Asai et al.~\cite{Asai2023}.
-Figure~\ref{fig:hodge}(c) reports the residual. The uncorrected summation diverges, its residual
-growing under refinement, in keeping with the non-convergence of the classical uncorrected SPH
-Laplacian on irregular clouds~\cite{Brookshaw1985,Fatehi2011,Basic2018}, so the renormalisation
-correction is essential to projection consistency. The renormalised operator, the GFDM operator
-and the Full-Inverse operator are by contrast all consistent and close, the two second-order
-operators improving the residual only marginally over the linear-consistent renormalised one.
-The reason is visible in Eq.~\eqref{eq:projresidual}: with a shared gradient the residual
-$(\mathsf L-\mathsf D\mathsf G)\phi$ is set by the gradient pairing $\mathsf D\mathsf G$ and not
-by the order of $\mathsf L$, so a more accurate Laplacian alone does not reduce it. Projection
-consistency is thus a property of how the divergence and gradient are paired, more than of the
-Laplacian's formal order, which is consistent with the central finding of this work that the
-closure, and not the interior order, governs the realised accuracy.
+We then isolated the choice of Laplacian. On an all-Dirichlet box, which every candidate operator can solve, we used the same renormalised gradient for $\mathsf D$ and $\mathsf G$.
+We then varied the Laplacian $\mathsf L$ in Eq.~\eqref{eq:projection}.
+We tested the uncorrected summation $N_i\sum_j W_{ij}f_{ij}$ (obtained by setting $w_{ij}=1$ in Eq.~\eqref{eq:lap}), the renormalised operator (with smooth-naive and sum normalisations), the GFDM operator from Section~\ref{sec:bvp}, and the Full Inverse operator of Asai et al.~\cite{Asai2023}.
+In Fig.~\ref{fig:hodge}(c), we report the residual.
+The uncorrected summation diverges.
+Its residual grows under refinement, which aligns with the well-known non-convergence of the uncorrected SPH Laplacian on irregular clouds~\cite{Brookshaw1985,Fatehi2011,Basic2018}.
+This demonstrates that renormalisation is essential for projection consistency.
+In contrast, the renormalised, GFDM, and Full Inverse operators are all consistent and yield similar results.
+The two second-order operators obtain only a marginal improvement in the residual compared to the linear-consistent renormalised operator.
+Equation~\eqref{eq:projresidual} explains this.
+With a shared gradient, the gradient pairing $\mathsf D\mathsf G$, rather than the accuracy of $\mathsf L$ itself, determines the residual $(\mathsf L-\mathsf D\mathsf G)\phi$.
+Consequently, a more accurate Laplacian alone cannot reduce the residual.
+We therefore show that projection consistency is a property of how we pair the divergence and the gradient, rather than the formal order of the Laplacian.
+This matches the central finding of this work.
+The boundary closure, and not the interior order, governs the final accuracy of the solution.
 
-The residual can be reduced further by repeating the decomposition: solving
-Eq.~\eqref{eq:projection} for the current divergence $r_k=\langle\nabla\!\cdot\mathbf u_k\rangle$
-and re-correcting, $\mathbf u_{k+1}=\mathbf u_k-\gradop{\delta\phi_k}$ with
-$\mathsf L\,\delta\phi_k=r_k$. Taking the discrete divergence of the update shows that this defect
-correction is a fixed-point (Richardson) iteration whose residual propagates by
-\begin{equation}
-  r_{k+1}=\big(\mathsf I-\mathsf D\mathsf G\,\mathsf L^{-1}\big)\,r_k
-         =(\mathsf L-\mathsf D\mathsf G)\,\mathsf L^{-1}\,r_k,
-  \label{eq:hodgeiter}
-\end{equation}
-i.e. it is preconditioned Richardson for the exact-projection system $\mathsf D\mathsf G\,\phi=r$
-with the renormalised Laplacian as preconditioner, and its convergence is governed by the spectral
-radius of the commutation defect $(\mathsf L-\mathsf D\mathsf G)\,\mathsf L^{-1}$. With the
-consistent interior source that radius is below but close to unity, so the iteration lowers the
-residual to a floor of about one to a few percent of the initial divergence and then stalls,
-never reaching a divergence-free state because the defect has a near-null mode it cannot remove
-[Fig.~\ref{fig:hodge}(b)]. If the raw one-sided divergence at the wall nodes is fed to the source
-rather than carried by the Neumann condition the radius exceeds unity and the iteration diverges
-(Fig.~\ref{fig:hodge}(b), $\rho_\infty\!\approx\!1.2$--$1.5$); this is the flux-only Neumann
-limitation of Section~\ref{sec:closure} reappearing in the divergence of the field, and it
-indicates that the divergence wall term is itself a candidate for the algebraic-ghost completion.
-The same mechanism limits a fixed-step pressure projection in an unsteady Lagrangian solver, where
-the source is the rough divergence of a straining, disordered cloud and the unit step amplifies the
-defect's particle-scale modes.
-
-The fixed unit step is, however, not intrinsic to the decomposition and can be replaced by the step
-that minimises the residual. Since $\mathsf D$ is linear, correcting
-$\mathbf u_{k+1}=\mathbf u_k-\alpha_k\gradop{\delta\phi_k}$ leaves the exact divergence
-$r_{k+1}=r_k-\alpha_k\,\mathsf g_k$ with $\mathsf g_k=\mathsf D\mathsf G\,\delta\phi_k$, so the
-minimiser
-\begin{equation}
-  \alpha_k=\frac{\langle r_k,\,\mathsf g_k\rangle}{\langle \mathsf g_k,\,\mathsf g_k\rangle}
-  \label{eq:mrstep}
-\end{equation}
-gives $\|r_{k+1}\|\le\|r_k\|$ \emph{unconditionally}, for any cloud and any source, irrespective of
-the spectral radius in Eq.~\eqref{eq:hodgeiter}. This minimal-residual (steepest-descent) step is a
-line search along the same direction the fixed iteration uses and costs one extra divergence
-evaluation and two inner products per sweep. On the diverging raw-source cases it brings the
-asymptotic factor from $\rho_\infty\!\approx\!1.2$--$1.5$ down to $\rho_\infty\!\le\!1$, with a
-residual floor several times smaller than the value the fixed step reaches before it blows up
-[Fig.~\ref{fig:hodge}(b)]; on the consistent interior source it stalls at the same near-null floor
-as the fixed step, now monotonically. The renormalised closure is therefore suited to a single
-Helmholtz--Hodge decomposition, with a small residual divergence that vanishes under refinement;
-iterating it is stable only with the minimal-residual step, which is the form to use when an
-approximately divergence-free field is sought from disordered or time-evolving clouds.
+We can reduce the residual further by repeating the decomposition.
+We do this by solving Eq.~\eqref{eq:projection} for the remaining divergence and applying a correction.
+This defect correction procedure lowers the residual to a floor of about one to three percent of the initial divergence.
+After that, the process stalls because the asymptotic contraction factor approaches unity.
+The iteration does not reach a completely divergence-free state.
+This is because the commutation defect has a near-null mode that we cannot remove, as shown in Fig.~\ref{fig:hodge}(b).
+If we feed the raw one-sided divergence at wall nodes directly to the source term rather than imposing it through the Neumann condition, the iteration diverges.
+This represents the flux-only Neumann limitation from Section~\ref{sec:closure} reappearing in the divergence field; we suggest that the divergence wall term is itself a candidate for algebraic-ghost stencil completion.
+Thus, the renormalised closure is best suited for a single Helmholtz-Hodge decomposition step.
+It yields a small residual divergence that vanishes under refinement, rather than a fully iterative path to a divergence-free field.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\textwidth]{fig_hodge.png}
-  \caption{The renormalised operators in a Helmholtz--Hodge decomposition of the manufactured
-  field~\eqref{eq:hodgefield}. (a) The residual divergence of the solenoidal part after one
-  decomposition against $\Delta$, on the box with the projection and algebraic-ghost Neumann
-  closures and on the wedge tank, with an order-one reference; it vanishes under refinement.
-  (b) Iterated defect correction at chaos $60\%$, fixed unit step (solid) versus the
-  minimal-residual step of Eq.~\eqref{eq:mrstep} (dashed): with the consistent interior source the
-  fixed step falls to a floor and stalls; feeding the raw one-sided wall divergence to the source
-  makes the fixed step diverge ($\rho_\infty>1$), whereas the minimal-residual step stays
-  non-expansive ($\rho_\infty\le1$) and reaches a lower floor. (c) The choice of
-  Laplacian, with a shared gradient on a Dirichlet box: the uncorrected summation diverges,
-  whereas the renormalised, GFDM and Full-Inverse operators are consistent and close, the
-  residual being set by the gradient pairing rather than the Laplacian order.}
+  \caption{Divergence residual convergence, iterated defect correction, and operator choices in the Helmholtz-Hodge decomposition.}
   \label{fig:hodge}
 \end{figure}
 
@@ -1276,48 +1140,42 @@ approximately divergence-free field is sought from disordered or time-evolving c
 \subsection{Computational aspects}
 \label{sec:cost}
 
-The closures add only local work to the interior assembly. The Neumann projection is a
-$d\times d$ projector built from at most $K$ boundary normals, with a single $K\times K$ Gram
-solve for GGP. The free-surface detection is the matrix-vector product $\Bi\ow$, already
-available from the assembly. The algebraic-ghost closure appends at most a few image samples
-per Neumann node and re-uses the same moment machinery. The boundary work is therefore $O(1)$
-per boundary node and is incurred only on the $O(N^{(d-1)/d})$ boundary nodes. The assembled
-system is sparse and nonsymmetric, because the correction weight $w_{ij}$ and the normalisation
-$N_i$ are row-local, and a Krylov solver such as BiCGStab or QMR with a Jacobi or ILU(0)
-preconditioner is appropriate, as in~\cite{Basic2018}. The recommended configuration is the
-poly6 kernel at $h=2.5\Delta$, or $h\in[2.0,2.25]\Delta$ for quasi-uniform clouds, with GGP
-projection for corner robustness and the algebraic-ghost closure where Neumann accuracy is
-required. The choices of AN against GGP and of projection against ghost are isolated, local
-code changes, since all downstream assembly consumes $\ow$ or the assembled row regardless.
+The closures only add local work during the interior assembly process.
+The Neumann projection uses a $d\times d$ projector built from at most $K$ boundary normals.
+This requires a single $K\times K$ Gram matrix solve when we use the GGP method.
+The free-surface detection relies on the matrix-vector product $\Bi\ow$, which we already compute during the standard assembly.
+The algebraic-ghost closure appends at most a few image samples for each Neumann node, re-using the same moment calculations.
+Thus, the boundary work is $O(1)$ per boundary node.
+We only incur it on the $O(N^{(d-1)/d})$ nodes near the boundaries.
+The assembled global system is sparse and non-symmetric because both the correction weights $w_{ij}$ and the normalisations $N_i$ are local to each row.
+A Krylov solver, such as BiCGStab or QMR with a Jacobi or ILU(0) preconditioner, is well-suited for solving this system, as discussed in~\cite{Basic2018}.
+We recommend the poly6 kernel at $h=2.5\Delta$, or $h\in[2.0,2.25]\Delta$ for quasi-uniform point clouds.
+For robust performance near corners, we recommend the GGP projection.
+Where high Neumann accuracy is required, we prefer the algebraic-ghost closure.
+The choices between AN and GGP, or between projection and ghosting, are isolated local code changes.
+All downstream calculations consume either the projected offset $\ow$ or the completed row, regardless of the specific options chosen.
 
 \subsection{Operator and closure combinations}
 \label{sec:combos}
 
-Every node is a single row of Eq.~\eqref{eq:row}, so a scheme is just an interior Laplacian
-together with a closure for each boundary type. Table~\ref{tab:schemes} collects the
-combinations with their realised convergence orders and per-node cost. The diagonal closures
-(projection, Robin) require the renormalised operator, whereas the reflection ghosts (even for a
-Neumann flux, odd for a free surface) pair with any operator and may be mixed with the diagonal
-forms, so the rows are representative rather than exhaustive. The smooth-naive and sum
-normalisations of the renormalised operator give the same order with the diagonal closures, sum
-only lowering the error constant, so the diagonal scheme is listed once; they differ only at the
-even-ghost Neumann, where the sum normalisation (exact for $|\mathbf x|^2$) reaches about $1.8$
-while smooth naive plateaus at about $1.4$, which is why both appear with the ghost closures.
+Every node corresponds to a single row in Eq.~\eqref{eq:row}.
+Thus, we form a complete scheme by combining an interior Laplacian operator with a closure for each boundary type.
+In Table~\ref{tab:schemes}, we collect these combinations, showing their convergence orders and relative per-node costs.
+The diagonal closures, namely projection and Robin, require the renormalised operator.
+In contrast, we can pair the reflection ghosts (even reflection for Neumann flux and odd reflection for free surfaces) with any operator.
+We can also mix them with diagonal forms.
+For this reason, the rows in the table are representative rather than exhaustive.
+The smooth-naive and sum normalisations of the renormalised operator yield the same convergence order when paired with diagonal closures.
+The sum normalisation only reduces the absolute error constant, so we list this diagonal scheme once.
+We only observe a difference when using even-ghost Neumann boundaries.
+There, the sum normalisation is exact for $|\mathbf x|^2$ and reaches about $1.8$, whereas the smooth-naive normalisation reaches a plateau at $1.4$.
+This is why both formulations appear with the ghost closures.
 
 \begin{table}[t]
   \centering
-  \caption{Schemes for the unified row of Eq.~\eqref{eq:row}: an interior Laplacian with a
-  Neumann and a free-surface closure, their realised solution-convergence orders (interior /
-  Neumann / free surface) on disordered clouds, and relative per-node cost. ``smooth naive'' and
-  ``sum'' are the trace- and denominator-normalised renormalised operators; ``ghost'' is the
-  even/odd reflection closure. Orders from Sections~\ref{sec:bvp} and~\ref{sec:combos}; cost from
-  Section~\ref{sec:cost}. The last column is the fraction of the field's divergence removed by a
-  single Helmholtz--Hodge projection at the finest resolution tested (Section~\ref{sec:hodge},
-  common renormalised gradient); being set by the divergence--gradient pairing rather than by the
-  Laplacian, it reaches about the same value for every corrected scheme, the uncorrected operators
-  alone failing to clean.}
+  \caption{Summary of numerical schemes showing their boundary closures, convergence rates, per-node costs, and divergence annihilation fractions.}
   \label{tab:schemes}
-  \small
+  \resizebox{\textwidth}{!}{%
   \begin{tabular}{@{}lllclc@{}}
     \toprule
     Laplacian & Neumann & Free surface & order (int / Neu / surf) & cost & div.\ cleaned \\
@@ -1328,129 +1186,103 @@ while smooth naive plateaus at about $1.4$, which is why both appear with the gh
     GFDM         & constraint & ghost & $1.8 / 0.9 / 2.0$ & high     & $94\%$ \\
     Full Inverse & ghost      & ghost & $1.8 / 1.8 / 2.0$ & moderate & $94\%$ \\
     \bottomrule
-  \end{tabular}
+  \end{tabular}%
+  }
 \end{table}
 
-Two of the table's rows are not, strictly, instances of the unified row, and the exceptions are
-worth stating. The generalised finite difference operator does not fold the boundary into a
-single equation: a Dirichlet node is pinned to its value and a Neumann node carries a local
-Karush--Kuhn--Tucker constraint block, so its system mixes interior, pinned and constrained row
-types. The Full-Inverse operator keeps one row per node, but that row is the solution of a
-per-node least-squares system rather than the single renormalised sum of Eq.~\eqref{eq:row}.
-Both are still free of boundary particles and of extra global unknowns --- the reflection ghost
-is ephemeral and the constraint multiplier is eliminated locally --- yet neither is the
-boundary-integrated single-equation form, and so neither is FIRM proper: they enter the table as
-a second-order interior baseline (GFDM) and as the same-family second-order operator (Full
-Inverse) that the algebraic-ghost closure is shown to transfer to, not as instances of the
-method. Canonical FIRM is the renormalised operator with the boundary flux integrated into the
-operator itself --- the Neumann flux placed in the right-hand side, and the free-surface value,
-recast as the value-dependent Robin flux of Section~\ref{sec:surface}, split between the
-right-hand side and the diagonal of one and the same row, with no boundary nodes, no constraints
-and no auxiliary unknowns. That is the first row of Table~\ref{tab:schemes}, the smooth-naive operator with the
-projection and Robin closures, of which the ghost rows are the stencil-completing variant, and
-which the name denotes exactly: a flux-integrated renormalised meshless operator.
+Two rows in the table are not strictly instances of our unified row.
+We should clarify exceptions.
+First, the generalised finite difference operator does not fold boundary conditions into a single equation.
+It pins a Dirichlet node directly to its value, and a Neumann node carries a local Karush-Kuhn-Tucker constraint block.
+Consequently, the global system mixes interior, pinned, and constrained row types.
+Second, the Full Inverse operator maintains a single row per node.
+However, we solve that row via a local least-squares system rather than the single renormalised sum of Eq.~\eqref{eq:row}.
+Both methods are still free of physical boundary particles and extra global unknowns.
+The reflection ghost is ephemeral and we eliminate the constraint multiplier locally.
+Yet, neither method is a boundary-integrated, single-equation formulation.
+They are not instances of FIRM proper.
+We include them in the table as a second-order interior baseline (GFDM) and as a same-family second-order operator (Full Inverse) to show how we can transfer the algebraic-ghost closure.
+We define canonical FIRM as the renormalised operator with the boundary flux integrated directly into the operator.
+We place the Neumann flux on the right-hand side.
+We split the free-surface value, recast as the value-dependent Robin flux of Section~\ref{sec:surface}, between the right-hand side and the diagonal of the same row.
+We achieve this without boundary nodes, constraint blocks, or auxiliary unknowns.
+This configuration corresponds to the first row of Table~\ref{tab:schemes}, which uses the smooth-naive operator with projection and Robin closures.
+The ghost rows represent the stencil-completing variant.
+The name denotes this exactly: a flux-integrated renormalised meshless operator.
 
-Two practical messages follow from Table~\ref{tab:schemes}. The renormalised operators
-introduced here are not the most accurate available: a fully second-order interior, whether the
-GFDM least-squares operator or the same-family Full-Inverse operator of Asai et
-al.~\cite{Asai2023}, attains a higher interior order. What the present construction offers
-instead is convenience. The interior operator is a single neighbour loop with no local linear
-solve, the boundary conditions are integrated by type on one code path with no auxiliary
-unknowns and no tuning, and the reflection-ghost closure is operator-agnostic, so a scheme is
-assembled by choosing one row and one closure per boundary type rather than by deriving a new
-operator. The cheapest combination in Table~\ref{tab:schemes}, the smooth-naive operator with
-the projection and Robin closures, is also the simplest to implement.
+Table~\ref{tab:schemes} delivers two practical messages.
+First, the renormalised operators introduced here are not the most accurate options available.
+A fully second-order interior operator, whether the GFDM least-squares operator or the Full Inverse operator of Asai et al.~\cite{Asai2023}, attains a higher interior convergence order.
+Instead, the proposed construction offers convenience.
+The interior operator uses a single neighbour loop with no local linear solve.
+We integrate boundary conditions by type on a single code path with no auxiliary unknowns or tuning parameters.
+Furthermore, the reflection-ghost closure is operator-agnostic.
+This allows us to assemble a scheme simply by choosing one row and one closure per boundary type, rather than deriving a new operator from scratch.
+The cheapest combination in Table~\ref{tab:schemes} is the smooth-naive operator with projection and Robin closures, which is also the simplest to implement.
 
-The Helmholtz--Hodge decomposition sharpens this point. The realised cleaning of the divergence
-is essentially independent of the accuracy ordering: every corrected scheme in
-Table~\ref{tab:schemes}, from the low-order renormalised operator to the second-order GFDM and
-Full-Inverse operators, removes the same $94\%$ of the field's divergence in a single
-decomposition, because the residual is set by the divergence--gradient pairing and not by the
-interior order (Section~\ref{sec:hodge}). The simple, low-order operator is therefore as
-effective as the higher-accuracy operators for this purpose, at a fraction of the cost, and the
-small remaining residual is reduced further by iterating the decomposition, which drives the
-divergence down to a floor of about one percent. That iteration must take the minimal-residual
-step (Section~\ref{sec:hodge}): being preconditioned Richardson on the non-adjoint
-divergence--gradient pairing, the fixed unit step can amplify the defect on disordered or
-time-evolving clouds, whereas the optimal step is non-expansive by construction. A low-order but
-conveniently assembled operator, combined appropriately and applied iteratively in this way, thus
-performs the Helmholtz--Hodge decomposition on a par with the higher-order alternatives.
+The Helmholtz-Hodge decomposition reinforces this point.
+The efficiency of the divergence removal is essentially independent of the accuracy ordering.
+Every corrected scheme in Table~\ref{tab:schemes}, from the low-order renormalised operator to the second-order GFDM and Full Inverse operators, removes the same $94\%$ of the initial divergence in a single step.
+This is because the divergence-gradient pairing, rather than the interior Laplacian order, sets the residual, as discussed in Section~\ref{sec:hodge}.
+Thus, the simple, low-order operator proves to be as effective as the more complex options, at a fraction of their cost.
+We can reduce the small remaining residual further by repeating the decomposition, driving the divergence down to a floor of about one percent.
+An iterative application of the conveniently assembled low-order operator performs the Helmholtz-Hodge decomposition on par with the higher-accuracy alternatives.
 
-% =============================================================================
 \section{Conclusions}
 \label{sec:concl}
 
-A boundary-integrated closure for renormalised meshless operators on elliptic boundary value
-problems has been presented.
-First, boundary conditions are integrated by type on a single code path. A Neumann flux enters
-the right-hand side, a Dirichlet or Robin value enters the diagonal, and the interior, the
-Neumann boundary, the free surface and the contact lines are assembled by one kernel. Second,
-the Neumann condition is imposed by a tangential projection performed in physical space before
-renormalisation, with a general Gram projector that treats arbitrary non-orthogonal corners
-exactly, and a complementary algebraic-ghost closure that completes the truncated boundary
-stencil without additional unknowns and removes the Neumann accuracy bottleneck. Third, the
-free surface is detected from the support-deficiency geometry of the cloud and enforced without
-any tuning or threshold parameter, the enforcement strength cancelling to the total kernel
-weight.
+We presented a boundary-integrated closure for renormalised meshless operators on elliptic boundary value problems.
+This method possesses three main features.
+First, we integrate boundary conditions by type on a single code path.
+A Neumann flux enters the right-hand side, and a Dirichlet or Robin value enters the diagonal.
+This allows us to assemble the interior, the Neumann boundary, the free surface, and the contact lines using a single kernel.
+Second, we impose the Neumann condition using a tangential projection in physical space before renormalisation.
+The general Gram projector treats arbitrary non-orthogonal corners exactly.
+A complementary algebraic-ghost closure completes the truncated boundary stencil without introducing additional unknowns, thereby removing the Neumann accuracy bottleneck.
+Third, the free surface is detected from the support-deficiency geometry of the cloud.
+It is enforced without tuning parameters or thresholds, as the enforcement strength cancels out to the total kernel weight.
 
-The closures are linear-exact on any cloud, including truncated and corner rows, as verified
-to round-off, and they were tested on irregular-domain Poisson benchmarks for regular and
-highly irregular clouds against a second-order GFDM baseline. The convergence is reported in
-full. The renormalised interior operator is linear-consistent and supraconverges at order
-about $1.3$ under strong disorder, where a fully second-order GFDM operator is more accurate.
-The value closure supraconverges, the flux-only Neumann closure is the accuracy-limiter, and
-the algebraic-ghost closure reduces the Neumann-limited error by about an order of magnitude
-and lets the Neumann region converge at the interior rate, approaching second order at a
-straight boundary with the sum normalisation. The value of the method lies in the generality,
-robustness and absence of tuning of its boundary closure, and in the convenience of its
-assembly, rather than in a high formal order. The interior operator is a single neighbour loop
-without a local solve, and the closures are selected by boundary type on one code path, so a
-scheme is assembled by combination rather than by deriving a new operator (Table~\ref{tab:schemes}).
+The closures are exact for linear fields on any cloud, including truncated and corner rows, as verified to round-off error.
+Performance was tested on irregular-domain Poisson benchmarks for regular and highly irregular point clouds, and compared against a second-order GFDM baseline.
+These convergence results are reported in full.
+The renormalised interior operator is linear-consistent and supraconverges at an order of about $1.3$ under strong disorder.
+In those highly disordered regions, a fully second-order GFDM operator attains higher accuracy.
+The value closure supraconverges, whereas the flux-only Neumann closure acts as the main accuracy bottleneck.
+This is solved by the algebraic-ghost closure.
+It reduces the error in the Neumann region by about an order of magnitude, letting the Neumann region converge at the interior rate.
+With the sum normalisation, second-order convergence is approached at straight boundaries.
+The primary value of the proposed method lies in the generality, robustness, and parameter-free nature of the boundary closure.
+The method also benefits from convenient assembly.
+The interior operator uses a single neighbour loop with no local solves, and closures are selected by boundary type on one code path.
+Consequently, a complete scheme is assembled by combining existing parts rather than deriving a new operator from scratch, as shown in Table~\ref{tab:schemes}.
 
-Several applications and extensions are topics for future work. The boundary closure is
-generic for elliptic boundary value problems on moving point clouds. A leading application is
-the Helmholtz--Hodge decomposition, examined in Section~\ref{sec:hodge}, in which the Neumann
-condition arises at solid boundaries and the free surface carries the value condition, with the
-pressure projection of an incompressible flow as one special case. There the operators are shown
-to be consistent for a single decomposition, with the residual divergence equal to their
-non-adjointness defect and vanishing under refinement, and governed by the divergence--gradient
-pairing rather than the Laplacian order. In consequence the simple low-order operator cleans the
-same fraction of the divergence in a single decomposition as the second-order GFDM and
-Full-Inverse operators, and an iterated decomposition with the minimal-residual step --- which
-keeps the iteration stable on the disordered, time-evolving clouds where a fixed step would
-diverge --- reduces the residual further, so the conveniently assembled low-order construction
-performs the Helmholtz--Hodge decomposition on a par with the higher-accuracy alternatives
-(Table~\ref{tab:schemes}). A full incompressible-flow
-application would
-additionally require the no-slip velocity Robin condition and the stress-free surface, which
-inherit the same boundary-condition-by-type treatment, and a divergence-free time integration;
-these were not assessed here. The motivating application is incompressible free-surface
-hydrodynamics --- sloshing, dam break, and wave impact on moving point clouds --- where the
-cloud-detected free surface, requiring neither surface particles nor a threshold, is the
-principal advantage. A distinct near-term application is the processing of scattered experimental
-velocity fields: pressure reconstruction from particle image velocimetry, in which a pressure
-Poisson problem is solved on a masked, mesh-unfriendly domain with Neumann data from the momentum
-balance at solid boundaries and a value condition at a free surface or far field, and the
-Helmholtz--Hodge filtering of noisy measured fields onto their divergence-free part.
-Fluid--structure interaction and other moving-boundary problems are further candidates for the
-same Lagrangian, geometry-detected treatment. A locally second-order-consistent
-interior operator, such as the Full-Inverse renormalised operator of Asai et
-al.~\cite{Asai2023} that reinstates the cross-derivative coupling, lifts the whole-domain order.
-Paired with the reflection-ghost closure --- even reflection for a Neumann wall, odd reflection
-for a Dirichlet free surface, the two composed at a contact line --- which transfers unchanged
-because it is operator-agnostic stencil completion, it yields about second order throughout: a
-second-order interior, a Neumann boundary at order about $1.8$, a detected curved free surface
-at order about $2.0$, and contact lines at the interior rate, with no extra unknowns
-(Section~\ref{sec:combos}). The same reflection ghosts apply to the linear-consistent
-renormalised operator, where the odd-ghost free surface in fact surpasses its diagonal-Robin
-value closure. A high-order flux-only Neumann treatment through the staggered KKT
-construction of Trask et al.~\cite{Trask2017} or the GFDM constraint
-row~\cite{Kuhnert2001,Tiwari2003} remains for future work. A curvature-aware reflection (the
-local planes are flat facets here), surface tension
-through a meshless curvature estimate, and three-dimensional validation are also left for
-future study.
+Several applications and extensions are foreseen for future research.
+The boundary closure is generic for elliptic boundary value problems on moving point clouds.
+A leading application is the Helmholtz-Hodge decomposition, which was examined in Section~\ref{sec:hodge}.
+In that context, the Neumann condition arises at solid boundaries, while the value condition is carried by the free surface.
+The pressure projection in incompressible flows is a key example.
+The operators are consistent for a single decomposition.
+The residual divergence is equal to their non-adjointness defect, which vanishes under refinement.
+The divergence-gradient pairing, rather than the Laplacian order, governs this residual.
+In practice, the simple, low-order operator cleans the same fraction of the divergence in a single step as the second-order GFDM and Full Inverse operators.
+An iterated decomposition reduces the residual further.
+Thus, the conveniently assembled low-order operator performs the Helmholtz-Hodge decomposition on par with the higher-accuracy alternatives.
+A full incompressible flow solver would also require a no-slip velocity Robin condition and a stress-free surface.
+These would inherit the same boundary-condition-by-type treatment, combined with a divergence-free time integration scheme, though these aspects were not assessed here.
+Incompressible free-surface hydrodynamics, including sloshing, dam break, and wave impact on moving point clouds, remains the motivating application.
+In those scenarios, the cloud-detected free surface represents the principal advantage because it requires no surface particles or threshold parameters.
+Another near-term application is the processing of scattered experimental velocity fields.
+This includes pressure reconstruction from particle image velocimetry.
+Here, a pressure Poisson problem is solved on a masked, irregular domain with Neumann data from the momentum balance at solid walls, and a value condition at the free surface or far field.
+The method can also be applied to the Helmholtz-Hodge filtering of noisy measured fields to recover their divergence-free component.
+Fluid-structure interaction and other moving-boundary problems are also candidates for this Lagrangian, geometry-detected treatment.
+A locally second-order-consistent interior operator, such as the Full Inverse renormalised operator of Asai et al.~\cite{Asai2023} which reinstates the cross-derivative coupling, lifts the overall accuracy.
+When paired with the reflection-ghost closure (using even reflection for Neumann walls, odd reflection for Dirichlet free surfaces, and composing them at contact lines), second-order accuracy is yielded throughout.
+This combination provides a second-order interior, a Neumann boundary at an order of about $1.8$, a detected curved free surface at about $2.0$, and contact lines at the interior rate, all without adding extra global unknowns.
+The same reflection ghosts apply to the linear-consistent renormalised operator, where the odd-ghost free surface actually outperforms the diagonal-Robin value closure.
+A high-order flux-only Neumann treatment using the staggered KKT construction of Trask et al.~\cite{Trask2017} or the GFDM constraint row~\cite{Kuhnert2001,Tiwari2003} remains a topic for future study.
+Curvature-aware reflections, surface tension via a meshless curvature estimate, and three-dimensional validation are left for future work.
 
-% =============================================================================
 \section*{Acknowledgements}
 Placeholder.
 

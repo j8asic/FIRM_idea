@@ -188,6 +188,26 @@ def fig_b5(d):
     fig.tight_layout()
     _save(fig, "fig_b5_surface.png")
 
+    # Save as 2 separate figures
+    fig_a, ax_a = plt.subplots(figsize=(7, 5))
+    ax_a.plot(pp[:, 0], pp[:, 1], "k-", lw=1.3)
+    ax_a.axhline(pb.FILL_H, color="royalblue", ls="--", lw=1.2)
+    sc = ax_a.scatter(pos[:, 0], pos[:, 1], c=info["sigma"], s=12, cmap="viridis", vmin=0, vmax=1)
+    ax_a.set_aspect("equal"); ax_a.set_xticks([]); ax_a.set_yticks([])
+    fig_a.colorbar(sc, ax=ax_a, shrink=0.8, label=r"detector $\sigma_i$")
+    ax_a.set_title(r"detected free surface $\sigma_i$ (interior $\equiv 0$)")
+    fig_a.tight_layout()
+    _save(fig_a, "fig_b5_surface_a.png")
+
+    fig_b, ax_b = plt.subplots(figsize=(6.5, 5))
+    plotstyle.loglog(ax_b, DXS, [
+        (r"prescribed ($%.2f$)" % conv["exact"]["order"], conv["exact"]["errs"], 3),
+        (r"detected ($%.2f$)" % conv["natural"]["order"], conv["natural"]["errs"], 2)])
+    ax_b.set_ylabel(r"surface-region RMS"); ax_b.legend(loc="best")
+    ax_b.set_title(r"detected vs prescribed surface (no tuning)")
+    fig_b.tight_layout()
+    _save(fig_b, "fig_b5_surface_b.png")
+
 
 # ============================================================ solution maps (fresh)
 def fig_solution_maps():
@@ -226,6 +246,32 @@ def fig_solution_maps():
                  r"chaos $60\%$")
     fig.tight_layout()
     _save(fig, "fig_solution_maps.png")
+
+    # Save as 4 separate figures
+    fig_a, ax_a = plt.subplots(figsize=(5.5, 5))
+    sc = plotstyle.solution_map(ax_a, p1, s1, trig, pb.SQUARE, r"square, Dirichlet")
+    fig_a.colorbar(sc, ax=ax_a, shrink=0.75)
+    fig_a.tight_layout()
+    _save(fig_a, "fig_solution_maps_a.png")
+
+    fig_b, ax_b = plt.subplots(figsize=(5.5, 5))
+    sc = plotstyle.solution_map(ax_b, p2, s2, trig, star, r"star, Dirichlet")
+    fig_b.colorbar(sc, ax=ax_b, shrink=0.75)
+    fig_b.tight_layout()
+    _save(fig_b, "fig_solution_maps_b.png")
+
+    fig_c, ax_c = plt.subplots(figsize=(5.5, 5))
+    sc = plotstyle.solution_map(ax_c, p3, s3, trig, flower, r"flower, Robin")
+    fig_c.colorbar(sc, ax=ax_c, shrink=0.75)
+    fig_c.tight_layout()
+    _save(fig_c, "fig_solution_maps_c.png")
+
+    fig_d, ax_d = plt.subplots(figsize=(5.5, 5))
+    sc = plotstyle.solution_map(ax_d, p4, s4, cf, pb.TANK, r"tank, walls + free surface",
+                                fill_h=pb.FILL_H)
+    fig_d.colorbar(sc, ax=ax_d, shrink=0.75)
+    fig_d.tight_layout()
+    _save(fig_d, "fig_solution_maps_d.png")
 
 
 # ============================================================ schematic
