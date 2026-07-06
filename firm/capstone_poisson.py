@@ -263,8 +263,9 @@ def make_plots(results, orders, path_prefix="capstone"):
     sc = ax.scatter(r["pos"][:, 0], r["pos"][:, 1], c=np.abs(r["p"] - r["pe"]), s=10, cmap="magma")
     ax.set_aspect("equal"); ax.set_title("|p - p*|  GGP/exact, finest dx (error concentrates at the wall/wedge)")
     fig.colorbar(sc, ax=ax, shrink=0.8); fig.tight_layout()
-    fig.savefig(f"{path_prefix}_error_field.png", dpi=130); plt.close(fig)
-    print(f"saved {path_prefix}_convergence.png and {path_prefix}_error_field.png")
+    err_name = os.path.join(os.path.dirname(path_prefix) or ".", "fig_error_field.png")
+    fig.savefig(err_name, dpi=130); plt.close(fig)
+    print(f"saved {path_prefix}_convergence.png and {err_name}")
 
 
 if __name__ == "__main__":

@@ -64,7 +64,7 @@ def fig_franke(d):
         if "fi" in r[cc]:
             series.append((r"FI ($%.2f$)" % r[cc]["fi"]["order"], r[cc]["fi"]["errs"], 2))
         plotstyle.loglog(ax[k], dxs, series)
-        ttl = r"regular" if cp == 0 else r"chaos $%d\%%$" % cp
+        ttl = r"regular" if cp == 0 else r"disorder $%d\%%$" % cp
         ax[k].set_title(ttl)
         ax[k].legend(loc="best")
     ax[0].set_ylabel(r"Error")
@@ -101,7 +101,7 @@ def fig_b1(d):
         if "fi" in r[cc]:
             series.append((r"FI ($%.2f$)" % r[cc]["fi"]["order"], r[cc]["fi"]["errs"], 2))
         plotstyle.loglog(ax[k], DXS, series)
-        ax[k].set_title(r"chaos $%d\%%$" % int(c * 100))
+        ax[k].set_title(r"disorder $%d\%%$" % int(c * 100))
         ax[k].legend(loc="best")
     ax[0].set_ylabel(r"Error")
     fig.suptitle(r"Square domain, Dirichlet, renormalised FIRM and the second-order "
@@ -122,7 +122,7 @@ def fig_neumann(d):
         plotstyle.loglog(ax[j], DXS, [
             (lab + r" ($%.2f$)" % res[cc][key]["order"], res[cc][key]["errs"], k)
             for key, lab, k in labels])
-        ax[j].set_title(r"all-Neumann box, chaos $%d\%%$" % cp)
+        ax[j].set_title(r"all-Neumann box, disorder $%d\%%$" % cp)
         ax[j].legend(loc="best")
     ax[0].set_ylabel(r"Error (mean-removed)")
     fig.suptitle(r"Neumann boundaries, mirror-ghost and flux-only closures")
@@ -143,7 +143,7 @@ def fig_b2(d):
         plotstyle.loglog(ax[j], DXS, [
             (lab + r" ($%.2f$)" % r[cc][key]["order"], r[cc][key]["errs"], k)
             for key, lab, k in keymap])
-        ax[j].set_title(r"star domain, chaos $%d\%%$" % cp)
+        ax[j].set_title(r"star domain, disorder $%d\%%$" % cp)
         ax[j].legend(loc="best")
     ax[0].set_ylabel(r"Error")
     fig.suptitle(r"Star domain, value and flux closures")
@@ -155,7 +155,7 @@ def fig_b3(d):
     r = d["B3_flower_robin"]
     fig, ax = plt.subplots(figsize=(6.5, 5))
     plotstyle.loglog(ax, DXS, [
-        (r"chaos $%d\%%$ ($%.2f$)" % (int(c * 100), r[f"chaos{int(c*100)}"]["order"]),
+        (r"disorder $%d\%%$ ($%.2f$)" % (int(c * 100), r[f"chaos{int(c*100)}"]["order"]),
          r[f"chaos{int(c*100)}"]["errs"], k) for k, c in enumerate(CHAOS)])
     ax.set_ylabel(r"Error")
     ax.legend(loc="best")
@@ -243,7 +243,7 @@ def fig_solution_maps():
                                 fill_h=pb.FILL_H)
     fig.colorbar(sc, ax=ax[3], shrink=0.75)
     fig.suptitle(r"Numerical solution in colour with exact-solution contours, "
-                 r"chaos $60\%$")
+                 r"disorder $60\%$")
     fig.tight_layout()
     _save(fig, "fig_solution_maps.png")
 

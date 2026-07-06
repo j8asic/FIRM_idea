@@ -277,8 +277,8 @@ def run_case(domain, dx, wc="projection", norm="trb", seed=7, jitter=0.3):
 # grad_op, used for D and the velocity correction G) and vary ONLY L, so the projection
 # residual Du = (L - DG)phi isolates each Laplacian's projection-consistency.
 OPERATORS = ("sum", "new", "denom", "gfdm", "fi")
-OP_LABEL = {"sum": "naive sum (uncorrected)", "new": "FIRM renorm (trb)",
-            "denom": "FIRM renorm (denom)", "gfdm": "GFDM 2nd-order",
+OP_LABEL = {"sum": "naive sum (uncorrected)", "new": "FIRM trace-normalised",
+            "denom": "FIRM sum-normalised", "gfdm": "GFDM 2nd-order",
             "fi": "Asai FI 2nd-order"}
 OP_MINNB = {"sum": 3, "new": 3, "denom": 3, "gfdm": 6, "fi": 3}
 
