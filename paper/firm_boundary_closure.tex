@@ -87,7 +87,7 @@ In SPH and ISPH, dummy or mirror particles, repulsive forces, or generalised wal
 While effective, these treatments typically introduce auxiliary particles and require tuning a length scale or a threshold.
 The free surface, in particular, is usually identified by a thresholded density or kernel-sum criterion~\cite{Doring2005,Lee2008}, or by the eigenvalues of the local renormalisation matrix~\cite{Marrone2010}, with empirically chosen threshold values.
 In a third approach, the boundary condition is appended as additional algebraic rows.
-In the generalised finite difference method (GFDM) and the finite-pointset method (FPM), weighted least squares fits a full Taylor basis and the boundary conditions enter as constraint rows~\cite{Benito2001,Kuhnert2001,Tiwari2003,Trask2017}, while radial-basis-function finite differences recover boundary accuracy by adding ghost nodes outside the domain~\cite{Bayona2010,Fedoseyev2002,Dobravec2024}.
+In the generalised finite difference method (GFDM) and the finite-pointset method (FPM), weighted least squares fits a full Taylor basis and the boundary conditions enter as constraint rows~\cite{Benito2001,Kuhnert2001,Tiwari2003,Suchde2018,Trask2017}, while radial-basis-function finite differences recover boundary accuracy by adding ghost nodes outside the domain~\cite{Bayona2010,Fedoseyev2002,Dobravec2024}.
 Across all these techniques, boundary enforcement demands stored degrees of freedom, a background grid, or a tuning parameter.
 
 A separate line of work imposes the boundary condition in algebraic form rather than extending the domain with extra geometry, and three main categories can be distinguished.
@@ -110,6 +110,8 @@ A Neumann flux enters the right-hand side, and a Dirichlet or Robin value enters
 Second, it is geometry-detected, in that the free surface is identified from the support-deficiency geometry of the cloud, requiring no surface particles and avoiding level sets.
 Third, it involves no case-dependent tuning.
 The enforcement strength reduces exactly to the total kernel weight, which is a purely geometric quantity, and the activation function that leaves interior nodes untouched uses fixed, dimensionless constants, so no penalty coefficients or tuning lengths are introduced.
+Two exact algebraic results underpin these properties.
+Projecting the support offset in physical space before renormalisation is shown to be the ordering that preserves linear consistency at the boundary, and the free-surface enforcement strength collapses to the total kernel weight through an exact cancellation rather than a modelling choice.
 A complementary algebraic-ghost closure is also introduced to resolve the accuracy bottleneck of the flux-only Neumann treatment.
 It completes the truncated boundary stencil with reflected samples that are formed on the fly and never stored globally, adding no extra unknowns.
 As a smaller supporting result, we present a single-sum interior operator, termed the trace-normalised operator, which bridges the naive and sum versions of~\cite{Basic2018} through a trace-based normalisation while retaining a single neighbour loop.
@@ -276,7 +278,7 @@ We also test a soft penalty-flux variant, referred to as the penalty form, and s
 The cross-term free LDD operator described in Section~\ref{sec:op-ldd} is linear-consistent.
 Asai et al.~\cite{Asai2023} proposed a systematic taxonomy of renormalised second-derivative models, in which their Block Diagonal operator is equivalent to the corrected Laplacian of Schwaiger~\cite{Schwaiger2008} and to the present family, while their Naive variant coincides with the Taylor-series form of Lian et al.~\cite{Lian2021}.
 Recovering full second-order pointwise consistency under particle disorder requires the Full Inverse operator, which reinstates the cross-derivative coupling that the block-diagonal reduction drops.
-This mirrors other consistent meshless second-derivative models, such as those of Espa\~nol and Revenga~\cite{Espanol2003}, the least-squares moving-particle method of Tamai and Koshizuka~\cite{Tamai2014}, and the GFDM operator in Section~\ref{sec:op-gfdm}.
+This mirrors other consistent meshless second-derivative models, such as those of Espa\~nol and Revenga~\cite{Espanol2003}, the least-squares moving-particle method of Tamai and Koshizuka~\cite{Tamai2014}, the local anisotropic basis function method, which attains arbitrarily high interior order on scattered nodes~\cite{King2020}, and the GFDM operator in Section~\ref{sec:op-gfdm}.
 The terminology in this area is unfortunately not uniform, since what Asai et al.~\cite{Asai2023} call Block Diagonal is the variant that the LDD literature terms Full Inverse~\cite{Basic2018,Basic2022}.
 
 This operator achieves second-order accuracy by fitting the full set of second derivatives, including the cross term, rather than just the trace.
@@ -457,6 +459,7 @@ For an orthogonal corner ($K=2$) the reflections commute and the set is $\{R_1\m
 For a non-orthogonal wedge the two planes generate an infinite image set, which we truncate to the two single reflections and the double reflection $R_2R_1$.
 This truncation does not reproduce the exact image set of the wedge.
 For the obtuse wedge angles tested in this work, between about $130$ and $140$ degrees, it restores the symmetry of the moment tensor $\Mi$ sufficiently to recover the convergence rates reported in Section~\ref{sec:b6}.
+Acute wedges, whose exact image sets grow denser as the angle narrows, were not tested.
 We reflect every neighbour $j$ as well as the node itself, and every image point within the support radius $h$ enters the stencil with its kernel weight, contributing to $\Mi$, $\oi$, and $N_i$ and restoring a near-symmetric support.
 The completed row can be normalised with either form from Section~\ref{sec:operators}.
 We prefer the sum normalisation in Eq.~\eqref{eq:Nden}, which restores close to second-order convergence at straight Neumann boundaries, and retain the trace-normalised form at non-orthogonal corners, as shown in Section~\ref{sec:neustraight}.
@@ -800,9 +803,13 @@ In this benchmark, we treat the upper boundary of a polygonal tank as an unknown
 The detector separates the interior from the surface clearly.
 The $90$th percentile of the interior indicator values is approximately $0.2$, well below the activation onset of $\tfrac23$, while the outermost surface ring yields values between $\lambda\approx0.7$ and $0.9$.
 The interior activation is zero, with no false activations at any tested resolution or disorder level on these statically jittered clouds of the tank geometry.
-Fragmenting or splashing surfaces are outside the scope of this study.
+The tested clouds are isotropically jittered.
+Anisotropically sheared node distributions, which arise in Lagrangian simulations between regularisation steps, compress the separation between the interior and surface indicator values, and their effect on the detector, like fragmenting or splashing surfaces, is outside the scope of this study.
 The recovered surface normal matches the analytical vertical direction to within a few percent.
 The geometry-detected closure closely tracks the exact-boundary reference, converging in the surface region at an order of about $1.5$, close to but slightly below the exact reference rate of $2.2$.
+The gap has a simple mechanism.
+The Robin recast imposes the target value at the estimated distance $\delta$ along the estimated normal, and both estimates carry a relative error of $O(\Delta)$, so the condition is enforced at a location that floats with the cloud, which perturbs the effective boundary position at first order.
+A sharper surface localisation, for example a local plane fitted through the activated band, would be required to close this gap and is left for future work.
 Figures~\ref{fig:b5_a} and~\ref{fig:b5_b} plot the detected activation field and compare the convergence rates.
 
 Two alternative detectors put this behaviour in context.
@@ -912,7 +919,8 @@ The residual divergence of the computed solenoidal part follows from Eq.~\eqref{
 The residual divergence is exactly the composition defect $(\mathsf L-\mathsf D\mathsf G)$ acting on the potential, and it vanishes identically for staggered finite-difference or finite-volume discretisations, where $\mathsf L=\mathsf D\mathsf G$ makes the decomposition exact.
 On collocated grids this situation is classical.
 Projection methods whose compact Laplacian only approximates the divergence-gradient composition are known as approximate projections~\cite{Almgren1996,Almgren2000}, and the SPH projection method of Cummins and Rudman~\cite{Cummins1999} faces the same choice between an exact but wide-stencil composition and a compact approximate Laplacian.
-The present study places the renormalised closure on this axis by answering two questions, namely whether the residual is small and whether it vanishes under refinement.
+Meshless discretisations that construct the divergence and gradient to be mutually adjoint by design, such as the staggered method of Trask et al.~\cite{Trask2017}, eliminate the defect at the cost of additional unknowns and wider coupling.
+The present closure takes the opposite position on this design axis, retaining one compact collocated row per node and quantifying the defect instead, by answering two questions, namely whether the residual is small and whether it vanishes under refinement.
 
 We construct a manufactured Helmholtz--Hodge decomposition to provide an analytical reference.
 With the stream function $\psi=\sin\pi x\,\sin\pi y$ and the potential $\phi^\star=\cos2\pi x\,\cos2\pi y$, we build the field
@@ -953,6 +961,9 @@ The iteration does not reach a completely divergence-free state, since the compo
 Feeding the raw one-sided divergence at wall nodes directly to the source term, rather than imposing it through the Neumann condition, makes the iteration diverge.
 This is the flux-only Neumann limitation of Section~\ref{sec:closure} reappearing in the divergence field, and the divergence wall term is itself a candidate for algebraic-ghost stencil completion.
 The renormalised closure is thus best suited to a single Helmholtz--Hodge decomposition step, yielding a small residual divergence that vanishes under refinement, rather than to a fully iterative path towards a divergence-free field.
+One consequence deserves emphasis for time-dependent applications.
+Because the defect operator is $O(1)$, the discrete map $\mathsf P=\mathsf I-\mathsf G\mathsf L^{-1}\mathsf D$ is not idempotent, and a time-stepping solver applies it repeatedly, so divergence residuals concentrated on the rough and boundary modes can accumulate over long integrations.
+The approximate-projection literature addresses this with explicit filtering of non-solenoidal modes~\cite{Rider1998}, whose meshless counterpart is particle-shifting regularisation, and the interplay between the closure and such filtering remains to be assessed.
 
 \begin{figure}[t]
   \centering
