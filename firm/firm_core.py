@@ -218,19 +218,29 @@ def reflect_complete(xi, xij, w, planes, h):
     xij, w : fluid-neighbour offsets (relative to xi) and kernel weights.
     planes : list of dicts, one per boundary plane, each
              {'n': outward unit normal (d,), 'foot': point on the plane RELATIVE to xi,
-              'kind': 'neumann' | 'dirichlet',
+              'kind': 'neumann' | 'dirichlet' | 'robin',
               'data': for 'neumann', the flux g = grad p . n (scalar);
                       for 'dirichlet', the surface value p_target -- a scalar (constant
                       surface value, e.g. 0 or a surface-tension datum) or a callable
                       f(x_abs) evaluated at the ghost's perpendicular foot (a spatially
-                      varying value, e.g. a manufactured solution)}.
+                      varying value, e.g. a manufactured solution);
+                      for 'robin' (dp/dn + alpha p = f), a dict {'alpha': scalar >= 0,
+                      'f': scalar or callable f(x_abs) evaluated at the ghost's
+                      perpendicular foot, exactly like the 'dirichlet' convention}}.
 
     Returns aligned arrays (offsets, weights, src_local, mult, const). A completed term
     has field value  mult*p_src + const, where src_local[m] indexes the fluid neighbour
     (-1 == particle i). For real neighbours (mult, const) = (1, 0). For a ghost the value
-    accumulates over the reflections of its composition:
+    accumulates over the reflections of its composition (sigma = (p - foot).n, the
+    signed distance of the running source position to the plane, < 0 for interior
+    sources):
         neumann (even):   value -> value - 2 sigma g          (mult unchanged)
-        dirichlet (odd):  value -> 2 p_target - value         (mult flips sign).
+        dirichlet (odd):  value -> 2 p_target - value         (mult flips sign)
+        robin (parity):   value -> ((1 + alpha sigma) value - 2 sigma f)
+                                   / (1 - alpha sigma)
+    The robin transform interpolates the parities: sigma < 0 and alpha >= 0 keep the
+    denominator >= 1 (no singularity); alpha = 0 recovers the even (neumann, g = f)
+    transform, and alpha -> inf with f = alpha*p_target the odd (dirichlet) one.
     Linear-reproducing: a ghost of a field satisfying the boundary condition equals the
     true field at the mirrored point, so any linear-exact operator inherits consistency
     -- which is why the renormalised single-sum, GFDM and Full-Inverse operators all
@@ -261,6 +271,14 @@ def reflect_complete(xi, xij, w, planes, h):
                     pt = float(data(xi + (p - sig * nrm))) if callable(data) else float(data)
                     cs = 2.0 * pt - cs
                     mu = -mu
+                elif pl["kind"] == "robin":  # dp/dn + alpha p = f
+                    data = pl["data"]
+                    alpha = float(data["alpha"])
+                    fdat = data["f"]
+                    fv = float(fdat(xi + (p - sig * nrm))) if callable(fdat) else float(fdat)
+                    den = 1.0 - alpha * sig      # sig < 0, alpha >= 0  ->  den >= 1
+                    mu = mu * (1.0 + alpha * sig) / den
+                    cs = (cs * (1.0 + alpha * sig) - 2.0 * sig * fv) / den
                 else:  # neumann
                     cs += -2.0 * sig * float(pl["data"])
                 p = p - 2.0 * sig * nrm
